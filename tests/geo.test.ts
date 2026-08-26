@@ -12,20 +12,18 @@ const point = (lat: number, lon: number): TrackPoint => ({
   lat,
   lon,
   ele: 0,
-  time: new Date(0),
+  time: Temporal.Instant.fromEpochMilliseconds(0),
 });
 
-describe("haversine rend la distance orthodromique entre deux points, en mètres", () => {
-  it("mesure un degré de latitude à 0,1 % près", () => {
+describe("haversine returns the great-circle distance between two points, in meters", () => {
+  it("measures one degree of latitude to within 0.1%", () => {
     const distance = haversine(point(45, 6), point(46, 6));
     const relativeError = Math.abs(distance - LATITUDE_DEGREE_METER) / LATITUDE_DEGREE_METER;
 
     expect(relativeError).toBeLessThan(RELATIVE_TOLERANCE);
   });
 
-  // Un degré de longitude vaut `cos(latitude)` degré de latitude : à 60°, le cosinus
-  // vaut exactement 1/2, d'où l'attendu à la moitié du degré de latitude.
-  it("mesure un degré de longitude à 60° de latitude comme un demi-degré de latitude, à 0,1 % près", () => {
+  it("measures one degree of longitude at 60° latitude as half a degree of latitude, to within 0.1%", () => {
     const expected = LATITUDE_DEGREE_METER / 2;
     const distance = haversine(point(60, 6), point(60, 7));
     const relativeError = Math.abs(distance - expected) / expected;
