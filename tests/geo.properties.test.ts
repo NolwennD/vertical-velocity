@@ -34,7 +34,14 @@ const arbitraryPoint = fc
     lat: fc.double({ min: -90, max: 90, noNaN: true }),
     lon: fc.double({ min: -180, max: 180, noNaN: true }),
   })
-  .map(({ lat, lon }): TrackPoint => ({ lat, lon, ele: 0, time: new Date(0) }));
+  .map(
+    ({ lat, lon }): TrackPoint => ({
+      lat,
+      lon,
+      ele: 0,
+      time: Temporal.Instant.fromEpochMilliseconds(0),
+    }),
+  );
 
 /**
  * Deux points obligatoires plus un reste de longueur libre : `fc.array` seul
