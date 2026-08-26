@@ -1,108 +1,112 @@
-# Vertical Velocity — plan d'implémentation
+# Vertical Velocity — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal :** une page web qui charge un GPX, détecte les parties montantes et affiche pour chacune sa vitesse ascensionnelle moyenne, sur un profil altimétrique annoté doublé d'un tableau.
+**Goal:** a web page that loads a GPX file, detects the climbs, and displays for each one its average vertical velocity, on an annotated elevation profile paired with a table.
 
-**Architecture :** tout s'exécute dans le navigateur. Le parsing est isolé derrière un adaptateur ; l'analyse est une suite de fonctions pures recevant leurs seuils en paramètre ; seuls `main.ts` et `ui/` touchent au DOM.
+**Architecture:** everything runs in the browser. Parsing is isolated behind an adapter; analysis is a series of pure functions receiving their thresholds as a parameter; only `main.ts` and `ui/` touch the DOM.
 
-**Tech Stack :** Vite, TypeScript, Chart.js + chartjs-plugin-annotation, @tmcw/togeojson, Vitest, fast-check, Playwright, Biome, lefthook, Stryker, pnpm.
+**Tech Stack:** Vite, TypeScript, Chart.js + chartjs-plugin-annotation, @tmcw/togeojson, Vitest, fast-check, Playwright, Biome, lefthook, Stryker, pnpm.
 
-**Spec :** [`docs/superpowers/specs/2026-08-26-vertical-velocity-design.md`](../specs/2026-08-26-vertical-velocity-design.md)
+**Spec:** [`docs/superpowers/specs/2026-08-26-vertical-velocity-design.md`](../specs/2026-08-26-vertical-velocity-design.md)
 
 ## Global Constraints
 
-- Gestionnaire de paquets : **pnpm** 11.24.0, figé par le champ `packageManager`. Node 24.10.0.
-- Dépendances d'exécution limitées à **`chart.js`**, **`chartjs-plugin-annotation`**, **`@tmcw/togeojson`**. Aucune autre sans décision explicite.
-- TypeScript en mode **`strict`** avec **`noUncheckedIndexedAccess`**.
-- Le vocabulaire du code n'emploie jamais l'acronyme « VAM » : forme développée `verticalVelocity` / `vertical-velocity`.
-- Unités **métriques** partout : mètres, m/h. Aucune conversion en pieds.
-- Tout nombre affiché passe par **`Intl.NumberFormat`** avec la locale active. Jamais de concaténation.
-- **Aucune lecture de variable globale enfouie dans la logique.** Ce qui vient de l'extérieur entre par un paramètre : parseur, `navigator.languages`, stockage, seuils.
-- Les fonctions d'analyse reçoivent les seuils en **paramètre à valeur par défaut** : `f(..., t: Thresholds = DEFAULTS)`.
-- **Éviter la mutation autant que possible.** Les données arrivent propres du parsing, et l'analyse les transforme sans les altérer. En particulier, jamais d'effet de bord dans un `map`, un `filter` ou un `reduce` : ces fonctions transforment, elles n'accumulent pas dans leur fermeture. Là où un parcours linéaire est indispensable — une somme courante ne s'écrit pas en O(n) sans accumulateur — la mutation reste **locale à la fonction**, sur une variable qui ne sort jamais de sa portée, et la fonction demeure pure vue du dehors.
-- `vite.config.ts` avec **`base: './'`**.
-- Langue par défaut : **anglais**.
-- Commits en français, à l'auteur du dépôt, **sans ligne de co-auteur**.
+- Package manager: **pnpm** 11.24.0, pinned via the `packageManager` field. Node 24.10.0.
+- Runtime dependencies limited to **`chart.js`**, **`chartjs-plugin-annotation`**, **`@tmcw/togeojson`**. No others without an explicit decision.
+- TypeScript in **`strict`** mode with **`noUncheckedIndexedAccess`**.
+- The code's vocabulary never uses the acronym "VAM": the spelled-out form `verticalVelocity` / `vertical-velocity` is used instead.
+- **Metric** units everywhere: meters, m/h. No conversion to feet.
+- Every displayed number goes through **`Intl.NumberFormat`** with the active locale. Never string concatenation.
+- **No reading of a global variable buried inside the logic.** Anything coming from outside enters through a parameter: parser, `navigator.languages`, storage, thresholds.
+- Analysis functions receive thresholds as a **parameter with a default value**: `f(..., t: Thresholds = DEFAULTS)`.
+- **Avoid mutation as much as possible.** Data arrives clean from parsing, and analysis transforms it without altering it. In particular, never a side effect inside a `map`, a `filter`, or a `reduce`: these functions transform, they don't accumulate inside their closure. Where a linear traversal is unavoidable — a running sum can't be written in O(n) without an accumulator — mutation stays **local to the function**, on a variable that never escapes its scope, and the function remains pure from the outside.
+- `vite.config.ts` with **`base: './'`**.
+- Default language: **English**.
+- Commits in French, under the repository's author, **with no co-author line**.
 
-## Structure des fichiers
+## File Structure
 
-| Fichier | Responsabilité |
+| File | Responsibility |
 |---|---|
-| `src/constants.ts` | Type `Thresholds` et objet `DEFAULTS` — les neuf seuils commentés |
-| `src/gpx/parser.ts` | Contrat : `TrackPoint`, `Track` (≥ 2 points), `GpxParser`, `GpxError` |
-| `src/gpx/togeojson-adapter.ts` | Implémentation du contrat via `@tmcw/togeojson` |
-| `src/analysis/geo.ts` | Haversine, distances cumulées |
-| `src/analysis/smooth.ts` | Médiane 5 points puis moyenne glissante 30 m |
-| `src/analysis/stops.ts` | Arrêts (6 m / 10 s), coupures d'enregistrement (60 s), ventilation du temps |
-| `src/analysis/climbs.ts` | Découpage en suites montantes, fusion des creux, filtrage |
-| `src/analysis/vertical-velocity.ts` | Type `Climb`, métriques par montée, pipeline `analyse()` |
-| `src/i18n/index.ts` | Détection, mémorisation, `t()`, formatage des nombres |
-| `src/i18n/en.ts`, `src/i18n/fr.ts` | Dictionnaires |
-| `src/ui/dropzone.ts` | Sélecteur de fichier et glisser-déposer |
-| `src/ui/chart.ts` | Profil Chart.js et bandes annotées |
-| `src/ui/table.ts` | Tableau des montées, survol synchronisé |
-| `src/ui/language-select.ts` | Sélecteur de langue |
-| `src/main.ts` | Câblage, orchestration, affichage des erreurs |
-| `tests/fixtures/` | Trace synthétique et `real-file-anonymised.gpx` |
+| `src/constants.ts` | `Thresholds` type and `DEFAULTS` object — the nine commented thresholds |
+| `src/gpx/parser.ts` | Contract: `TrackPoint`, `Track` (≥ 2 points), `GpxParser`, `GpxError` |
+| `src/gpx/togeojson-adapter.ts` | Contract implementation via `@tmcw/togeojson` |
+| `src/analysis/geo.ts` | Haversine, cumulative distances |
+| `src/analysis/smooth.ts` | 5-point median then 30 m moving average |
+| `src/analysis/stops.ts` | Stops (6 m / 10 s), recording gaps (60 s), time breakdown |
+| `src/analysis/climbs.ts` | Splitting into ascending runs, dip merging, filtering |
+| `src/analysis/vertical-velocity.ts` | `Climb` type, per-climb metrics, `analyse()` pipeline |
+| `src/i18n/index.ts` | Detection, persistence, `t()`, number formatting |
+| `src/i18n/en.ts`, `src/i18n/fr.ts` | Dictionaries |
+| `src/ui/dropzone.ts` | File picker and drag-and-drop |
+| `src/ui/chart.ts` | Chart.js profile and annotated bands |
+| `src/ui/table.ts` | Climbs table, synchronized hover |
+| `src/ui/language-select.ts` | Language selector |
+| `src/main.ts` | Wiring, orchestration, error display |
+| `tests/fixtures/` | Synthetic track and `real-file-anonymised.gpx` |
 
-## Note sur les tests
+## Note on Tests
 
-Chaque tâche décrit ses tests sous forme de **règles** et d'**exemples**, à la manière de
-l'example mapping. La règle énonce le comportement attendu ; les exemples donnent les cas
-concrets à couvrir. Les questions ouvertes sont signalées et doivent être tranchées avant
-d'écrire le test, pas pendant.
+Each task describes its tests as **rules** and **examples**, in the style of
+example mapping. The rule states the expected behavior; the examples give
+the concrete cases to cover. Open questions are flagged and must be settled
+before writing the test, not during.
 
-L'implémenteur écrit les assertions lui-même, en respectant le cycle décrit ci-dessous.
+The implementer writes the assertions themselves, following the cycle described below.
 
-### Chercher les propriétés avant les exemples
+### Look for Properties Before Examples
 
-Pour chaque règle, se demander d'abord s'il existe un **invariant** vrai sur toutes les
-entrées, et non seulement sur les trois cas choisis. Une propriété se vérifie avec
-**fast-check**, qui engendre des centaines d'entrées et réduit automatiquement le
-contre-exemple quand elle tombe en défaut.
+For each rule, first ask whether there is an **invariant** that holds for
+all inputs, not just the three chosen cases. A property is checked with
+**fast-check**, which generates hundreds of inputs and automatically
+shrinks the counterexample when it fails.
 
-Exemples d'invariants du domaine : une distance est toujours positive ou nulle ; elle ne
-dépend pas de l'ordre des arguments ; des distances cumulées sont croissantes et de même
-longueur que l'entrée ; un lissage ne change jamais le nombre de points ; la somme des temps
-de mouvement, d'arrêt et de coupure égale toujours la durée totale.
+Examples of domain invariants: a distance is always positive or zero; it
+doesn't depend on the order of the arguments; cumulative distances are
+increasing and of the same length as the input; smoothing never changes the
+number of points; the sum of moving time, stopped time, and gap time always
+equals the total duration.
 
-Les exemples chiffrés restent nécessaires — ils ancrent les valeurs concrètes, et une
-propriété seule passerait sur une implémentation qui rend systématiquement zéro. Les deux se
-complètent : **la propriété dit ce qui est toujours vrai, l'exemple dit ce qui est vrai
-ici**. L'ordre de recherche compte : chercher la propriété d'abord fait souvent découvrir
-que trois exemples en couvraient un seul cas.
+Concrete numeric examples are still necessary — they anchor real values,
+and a property alone would pass on an implementation that always returns
+zero. The two complement each other: **the property says what is always
+true, the example says what is true here**. The search order matters:
+looking for the property first often reveals that three examples were
+covering only a single case.
 
-Les tests de mutation (Stryker, tâche 16) viennent **après**, jamais avant : ils mesurent la
-force des tests existants. Les y soumettre sans avoir cherché les invariants reviendrait à
-mesurer une faiblesse déjà connue.
+Mutation testing (Stryker, task 16) comes **after**, never before: it
+measures the strength of the existing tests. Submitting them to it without
+having looked for the invariants would amount to measuring an
+already-known weakness.
 
-## Méthode d'exécution
+## Execution Method
 
-Le cycle TDD en ping-pong, la répartition des rôles entre agents, la boucle de test et les
-conventions de commit sont décrits dans **[CLAUDE.md](../../../CLAUDE.md)**, à la racine du
-dépôt. Ils s'appliquent à toutes les tâches de ce plan.
+The ping-pong TDD cycle, the division of roles between agents, the test
+loop, and the commit conventions are described in
+**[CLAUDE.md](../../../CLAUDE.md)**, at the repository root. They apply to
+all tasks in this plan.
 
-Rappel du seul point propre au plan : **l'unité de travail est une règle**, pas une tâche
-entière ni un exemple isolé. Les exemples d'une règle forment les cas d'un même bloc de
-test. Une tâche de quatre règles donne quatre cycles.
+Reminder of the one point specific to this plan: **the unit of work is a
+rule**, not an entire task or a single example. A rule's examples form the
+cases of a single test block. A task with four rules yields four cycles.
 
 ---
 
-### Task 1 : Socle du projet
+### Task 1: Project Foundation
 
 **Files:**
 - Create: `package.json`, `vite.config.ts`, `tsconfig.json`, `biome.json`, `lefthook.yml`, `index.html`, `src/main.ts`, `src/styles.css`
 
 **Interfaces:**
-- Consumes: rien
-- Produces: les scripts `dev`, `build`, `preview`, `lint`, `format`, `typecheck`, `test`, `test:e2e`
+- Consumes: nothing
+- Produces: the `dev`, `build`, `preview`, `lint`, `format`, `typecheck`, `test`, `test:e2e` scripts
 
-- [ ] **Step 1 : Initialiser le projet**
+- [ ] **Step 1: Initialize the project**
 
-`pnpm init`, puis renseigner `"packageManager": "pnpm@11.24.0"` et `"type": "module"`.
+`pnpm init`, then set `"packageManager": "pnpm@11.24.0"` and `"type": "module"`.
 
-- [ ] **Step 2 : Installer les dépendances**
+- [ ] **Step 2: Install the dependencies**
 
 ```bash
 pnpm add chart.js chartjs-plugin-annotation @tmcw/togeojson
@@ -112,33 +116,33 @@ pnpm add chart.js chartjs-plugin-annotation @tmcw/togeojson
 pnpm add -D vite typescript @biomejs/biome vitest lefthook knip
 ```
 
-- [ ] **Step 3 : Configurer TypeScript**
+- [ ] **Step 3: Configure TypeScript**
 
-`tsconfig.json` avec `strict: true`, `noUncheckedIndexedAccess: true`, `target: "ES2022"`, `module: "ESNext"`, `moduleResolution: "bundler"`, `noEmit: true`, `lib: ["ES2022", "DOM"]`.
+`tsconfig.json` with `strict: true`, `noUncheckedIndexedAccess: true`, `target: "ES2022"`, `module: "ESNext"`, `moduleResolution: "bundler"`, `noEmit: true`, `lib: ["ES2022", "DOM"]`.
 
-- [ ] **Step 4 : Configurer Vite**
+- [ ] **Step 4: Configure Vite**
 
-`vite.config.ts` exportant `defineConfig({ base: './' })`.
+`vite.config.ts` exporting `defineConfig({ base: './' })`.
 
-- [ ] **Step 5 : Configurer Biome et lefthook**
+- [ ] **Step 5: Configure Biome and lefthook**
 
-`biome.json` : lint et format activés. `lefthook.yml` : un hook `pre-commit` lançant `biome format --write` sur les fichiers indexés, avec `stage_fixed: true`. Le hook ne lance **ni** lint bloquant, **ni** tests, **ni** typecheck. Installer avec `pnpm lefthook install`.
+`biome.json`: lint and format enabled. `lefthook.yml`: a `pre-commit` hook running `biome format --write` on staged files, with `stage_fixed: true`. The hook runs **neither** a blocking lint, **nor** tests, **nor** typecheck. Install with `pnpm lefthook install`.
 
-- [ ] **Step 6 : Page minimale**
+- [ ] **Step 6: Minimal page**
 
-`index.html` avec les conteneurs vides : `#dropzone`, `#chart`, `#table`, `#message`, `#language`. `src/main.ts` réduit à un log. `src/styles.css` vide.
+`index.html` with the empty containers: `#dropzone`, `#chart`, `#table`, `#message`, `#language`. `src/main.ts` reduced to a log. `src/styles.css` empty.
 
-- [ ] **Step 7 : Déclarer les scripts**
+- [ ] **Step 7: Declare the scripts**
 
 `dev`, `build`, `preview`, `lint` (`biome check`), `format` (`biome format --write`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`), `test:related` (`vitest related --run`), `knip`.
 
-`test:related` est la commande de la boucle de test décrite plus haut : elle n'exécute que les tests important les fichiers qu'on lui passe.
+`test:related` is the test-loop command described above: it only runs the tests importing the files passed to it.
 
-- [ ] **Step 8 : Vérifier le socle**
+- [ ] **Step 8: Verify the foundation**
 
-Lancer `pnpm lint`, `pnpm typecheck`, `pnpm build`. Les trois doivent réussir. Lancer `pnpm dev` et constater que la page se charge sans erreur de console.
+Run `pnpm lint`, `pnpm typecheck`, `pnpm build`. All three must succeed. Run `pnpm dev` and confirm the page loads without a console error.
 
-- [ ] **Step 9 : Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A && git commit -m "Met en place le socle Vite, TypeScript, Biome et lefthook"
@@ -146,13 +150,13 @@ git add -A && git commit -m "Met en place le socle Vite, TypeScript, Biome et le
 
 ---
 
-### Task 2 : Seuils et contrat de parsing
+### Task 2: Thresholds and Parsing Contract
 
 **Files:**
 - Create: `src/constants.ts`, `src/gpx/parser.ts`
 
 **Interfaces:**
-- Consumes: rien
+- Consumes: nothing
 - Produces:
   ```ts
   export type Thresholds = {
@@ -175,15 +179,15 @@ git add -A && git commit -m "Met en place le socle Vite, TypeScript, Biome et le
   export type GpxParser = (xml: string) => Track;
   ```
 
-- [ ] **Step 1 : Écrire les deux fichiers**
+- [ ] **Step 1: Write the two files**
 
-Chaque seuil de `DEFAULTS` porte un commentaire d'une ligne rappelant ce qu'il décide. `GpxError` transporte un `code` typé, jamais un message libre : c'est lui que l'interface traduit.
+Each threshold in `DEFAULTS` carries a one-line comment stating what it decides. `GpxError` carries a typed `code`, never a free-form message: it is the `code` that the interface translates.
 
-- [ ] **Step 2 : Vérifier**
+- [ ] **Step 2: Verify**
 
-`pnpm typecheck` et `pnpm lint` passent. Pas de test unitaire : ce sont des déclarations.
+`pnpm typecheck` and `pnpm lint` pass. No unit test: these are declarations.
 
-- [ ] **Step 3 : Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add -A && git commit -m "Déclare les seuils par défaut et le contrat de parsing GPX"
@@ -191,7 +195,7 @@ git add -A && git commit -m "Déclare les seuils par défaut et le contrat de pa
 
 ---
 
-### Task 3 : Géométrie
+### Task 3: Geometry
 
 **Files:**
 - Create: `src/analysis/geo.ts`, `tests/geo.test.ts`
@@ -200,37 +204,37 @@ git add -A && git commit -m "Déclare les seuils par défaut et le contrat de pa
 - Consumes: `TrackPoint`
 - Produces:
   ```ts
-  export function haversine(a: TrackPoint, b: TrackPoint): number;          // mètres
+  export function haversine(a: TrackPoint, b: TrackPoint): number;          // meters
   export function cumulativeDistances(points: Track): number[];
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : `haversine` rend la distance orthodromique en mètres.**
-> - deux points séparés d'un degré de latitude → ≈ 111 195 m, à 0,1 % près
->   (soit `6 371 000 × π/180` ; ne pas confondre avec les 111 320 m d'un degré de
->   longitude à l'équateur, qui se calculent sur le rayon équatorial)
-> - deux points identiques → 0
-> - l'ordre des arguments ne change pas le résultat
+> **Rule: `haversine` returns the great-circle distance in meters.**
+> - two points one degree of latitude apart → ≈ 111,195 m, within 0.1%
+>   (i.e. `6,371,000 × π/180`; not to be confused with the 111,320 m of a degree of
+>   longitude at the equator, which is computed from the equatorial radius)
+> - two identical points → 0
+> - the order of the arguments doesn't change the result
 
-> **Règle : `cumulativeDistances` rend un tableau de même longueur que l'entrée, croissant, commençant à 0.**
-> - trois points alignés espacés de 100 m → `[0, 100, 200]`
-> - un seul point → `[0]`
-> - tableau vide → `[]`
+> **Rule: `cumulativeDistances` returns an array of the same length as the input, increasing, starting at 0.**
+> - three points in a line, 100 m apart → `[0, 100, 200]`
+> - a single point → `[0]`
+> - empty array → `[]`
 
-- [ ] **Step 1 : Écrire les tests des deux règles ci-dessus, et les voir échouer**
+- [ ] **Step 1: Write the tests for the two rules above, and watch them fail**
 
-Run: `pnpm test geo` — attendu : échec, module introuvable.
+Run: `pnpm test geo` — expected: failure, module not found.
 
-- [ ] **Step 2 : Implémenter `geo.ts`**
+- [ ] **Step 2: Implement `geo.ts`**
 
-Rayon terrestre 6 371 000 m.
+Earth radius 6,371,000 m.
 
-- [ ] **Step 3 : Voir les tests passer**
+- [ ] **Step 3: Watch the tests pass**
 
 Run: `pnpm test geo`
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le calcul des distances haversine"
@@ -238,7 +242,7 @@ git add -A && git commit -m "Ajoute le calcul des distances haversine"
 
 ---
 
-### Task 4 : Adaptateur de parsing
+### Task 4: Parsing Adapter
 
 **Files:**
 - Create: `src/gpx/togeojson-adapter.ts`, `tests/togeojson-adapter.test.ts`, `tests/fixtures/minimal.gpx`
@@ -246,56 +250,56 @@ git add -A && git commit -m "Ajoute le calcul des distances haversine"
 
 **Interfaces:**
 - Consumes: `TrackPoint`, `GpxParser`, `GpxError`, `GpxErrorCode`
-- Produces: `export const parseGpx: GpxParser;   // rend une Track : au moins deux points`
+- Produces: `export const parseGpx: GpxParser;   // returns a Track: at least two points`
 
-**Tests — intention**
+**Tests — intent**
 
-Les tests visent le **contrat**, pas la librairie : ils doivent rester valables si l'adaptateur est un jour remplacé. Aucun test ne mentionne GeoJSON.
+The tests target the **contract**, not the library: they must stay valid even if the adapter is replaced one day. No test mentions GeoJSON.
 
-> **Règle : un GPX valide devient une suite de `TrackPoint` dans l'ordre du fichier.**
-> - trois `<trkpt>` avec `<ele>` et `<time>` → trois points, coordonnées et altitudes exactes, `time` en `Date`
-> - deux `<trkseg>` consécutifs → les points sont concaténés en une seule suite
+> **Rule: a valid GPX becomes a sequence of `TrackPoint` in the file's order.**
+> - three `<trkpt>` with `<ele>` and `<time>` → three points, exact coordinates and elevations, `time` as a `Date`
+> - two consecutive `<trkseg>` → the points are concatenated into a single sequence
 > - `tests/fixtures/real-file-anonymised.gpx` → 3422 points
 
-> **Règle : les défaillances remontent en `GpxError` portant un code du domaine.**
-> - une chaîne qui n'est pas du XML → code `invalid-xml`
-> - un XML bien formé sans aucun `<trkpt>` → code `no-track-points`
-> - un GPX dont aucun point ne porte `<ele>` → code `no-elevation`
-> - un GPX dont aucun point ne porte `<time>` → code `no-time`
-> - aucune erreur ne laisse fuir un message ou un type venu de la librairie
+> **Rule: failures surface as a `GpxError` carrying a domain code.**
+> - a string that isn't XML → code `invalid-xml`
+> - well-formed XML with no `<trkpt>` at all → code `no-track-points`
+> - a GPX where no point carries `<ele>` → code `no-elevation`
+> - a GPX where no point carries `<time>` → code `no-time`
+> - no error leaks a message or a type coming from the library
 
-> **Règle : les points partiellement renseignés sont ignorés sans faire échouer le parsing.**
-> - sur cinq points dont un sans `<ele>` → quatre points rendus
-> - sur cinq points dont un sans `<time>` → quatre points rendus
+> **Rule: partially populated points are ignored without failing the parsing.**
+> - out of five points, one without `<ele>` → four points returned
+> - out of five points, one without `<time>` → four points returned
 
-> **Question à trancher avant d'écrire le test** : un fichier où *certains* points portent
-> `<ele>` et d'autres non doit-il rendre les points valides, ou lever `no-elevation` ?
-> Décision retenue : rendre les points valides, et ne lever `no-elevation` que si **aucun**
-> point n'en porte. Le fichier reste exploitable tant qu'il subsiste des points complets.
+> **Question to settle before writing the test**: should a file where *some* points carry
+> `<ele>` and others don't return the valid points, or raise `no-elevation`?
+> Decision made: return the valid points, and only raise `no-elevation` if **no**
+> point carries one. The file stays usable as long as complete points remain.
 
-- [ ] **Step 1 : Déplacer la fixture réelle**
+- [ ] **Step 1: Move the real fixture**
 
 ```bash
 mkdir -p tests/fixtures && git mv real-file-anonymised.gpx tests/fixtures/ 2>/dev/null || mv real-file-anonymised.gpx tests/fixtures/
 ```
 
-- [ ] **Step 2 : Écrire `tests/fixtures/minimal.gpx`**
+- [ ] **Step 2: Write `tests/fixtures/minimal.gpx`**
 
-Un GPX 1.1 de trois points, altitudes et horodatages explicites, sans extensions.
+A GPX 1.1 with three points, explicit elevations and timestamps, no extensions.
 
-- [ ] **Step 3 : Écrire les tests des trois règles, et les voir échouer**
-
-Run: `pnpm test togeojson-adapter`
-
-- [ ] **Step 4 : Implémenter l'adaptateur**
-
-`toGeoJSON.gpx()` rend une `FeatureCollection`. Les altitudes sont la troisième composante des coordonnées ; les horodatages vivent dans `properties.coordinateProperties.times`. L'adaptateur réunit les deux, filtre les points incomplets et traduit toute défaillance en `GpxError`.
-
-- [ ] **Step 5 : Voir les tests passer**
+- [ ] **Step 3: Write the tests for the three rules, and watch them fail**
 
 Run: `pnpm test togeojson-adapter`
 
-- [ ] **Step 6 : Commit**
+- [ ] **Step 4: Implement the adapter**
+
+`toGeoJSON.gpx()` returns a `FeatureCollection`. Elevations are the third component of the coordinates; timestamps live in `properties.coordinateProperties.times`. The adapter joins the two, filters out incomplete points, and translates any failure into a `GpxError`.
+
+- [ ] **Step 5: Watch the tests pass**
+
+Run: `pnpm test togeojson-adapter`
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute l'adaptateur de parsing GPX et les fixtures de test"
@@ -303,7 +307,7 @@ git add -A && git commit -m "Ajoute l'adaptateur de parsing GPX et les fixtures 
 
 ---
 
-### Task 5 : Lissage de l'altitude
+### Task 5: Elevation Smoothing
 
 **Files:**
 - Create: `src/analysis/smooth.ts`, `tests/smooth.test.ts`
@@ -319,35 +323,35 @@ git add -A && git commit -m "Ajoute l'adaptateur de parsing GPX et les fixtures 
   ): number[];
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : le filtre médian supprime les altitudes aberrantes isolées.**
-> - une rampe régulière dont un seul point est décalé de +40 m → le pic disparaît
-> - deux points aberrants **consécutifs** au milieu d'une fenêtre de 5 → sont encore corrigés
-> - trois points aberrants consécutifs → ne le sont plus, et c'est le comportement attendu d'une médiane sur 5
+> **Rule: the median filter removes isolated outlier elevations.**
+> - a steady ramp where a single point is offset by +40 m → the spike disappears
+> - two **consecutive** outlier points in the middle of a window of 5 → are still corrected
+> - three consecutive outlier points → are no longer corrected, which is the expected behavior of a median over 5
 
-> **Règle : la moyenne glissante travaille sur une fenêtre exprimée en mètres, pas en points.**
-> - deux traces de même géométrie, l'une échantillonnée toutes les secondes, l'autre toutes les cinq secondes → altitudes lissées comparables à 1 m près
-> - une rampe régulière → reste une rampe, altitudes inchangées à 0,5 m près
-> - une vraie rupture de pente (plat puis 8 %) → conservée, non rabotée
+> **Rule: the moving average works on a window expressed in meters, not in points.**
+> - two tracks with the same geometry, one sampled every second, the other every five seconds → smoothed elevations comparable within 1 m
+> - a steady ramp → stays a ramp, elevations unchanged within 0.5 m
+> - a real grade break (flat then 8%) → preserved, not smoothed away
 
-> **Règle : la sortie a toujours la longueur de l'entrée.**
-> - tableau vide → tableau vide
-> - un seul point → un seul élément, égal à son altitude
+> **Rule: the output always has the length of the input.**
+> - empty array → empty array
+> - a single point → a single element, equal to its elevation
 
-- [ ] **Step 1 : Écrire les tests des trois règles, et les voir échouer**
-
-Run: `pnpm test smooth`
-
-- [ ] **Step 2 : Implémenter `smooth.ts`**
-
-Deux passes. La fenêtre glissante est centrée : elle s'étend de part et d'autre du point courant jusqu'à couvrir `smoothingWindowM` au total, soit la moitié de chaque côté.
-
-- [ ] **Step 3 : Voir les tests passer**
+- [ ] **Step 1: Write the tests for the three rules, and watch them fail**
 
 Run: `pnpm test smooth`
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 2: Implement `smooth.ts`**
+
+Two passes. The moving window is centered: it extends on both sides of the current point until it covers `smoothingWindowM` in total, i.e. half on each side.
+
+- [ ] **Step 3: Watch the tests pass**
+
+Run: `pnpm test smooth`
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le lissage de l'altitude"
@@ -355,7 +359,7 @@ git add -A && git commit -m "Ajoute le lissage de l'altitude"
 
 ---
 
-### Task 6 : Arrêts et ventilation du temps
+### Task 6: Stops and Time Breakdown
 
 **Files:**
 - Create: `src/analysis/stops.ts`, `tests/stops.test.ts`
@@ -375,43 +379,43 @@ git add -A && git commit -m "Ajoute le lissage de l'altitude"
   ): TimeBreakdown;
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : un arrêt est une immobilité d'au moins 10 s dans un rayon de 6 m.**
-> - 30 s à la même position → marqué arrêt
-> - 6 s à la même position → **non** marqué : trop bref
-> - 30 s de dérive lente dans un rayon de 4 m → marqué arrêt, le bruit GPS ne l'annule pas
-> - 30 s de progression régulière à 4 km/h → non marqué
+> **Rule: a stop is at least 10 s of immobility within a 6 m radius.**
+> - 30 s at the same position → marked as a stop
+> - 6 s at the same position → **not** marked: too brief
+> - 30 s of slow drift within a 4 m radius → marked as a stop, GPS noise doesn't cancel it
+> - 30 s of steady progress at 4 km/h → not marked
 
-> **Règle : un intervalle de plus de 60 s est une coupure d'enregistrement, ni mouvement ni arrêt.**
-> - un saut de 10 min entre deux points éloignés → compté en `gapS`
-> - un saut de 10 min entre deux points au même endroit → compté en `gapS`, pas en `stoppedS`
-> - un intervalle de 59 s → n'est pas une coupure
+> **Rule: a gap of more than 60 s is a recording gap, neither movement nor a stop.**
+> - a 10 min jump between two distant points → counted in `gapS`
+> - a 10 min jump between two points at the same location → counted in `gapS`, not in `stoppedS`
+> - a 59 s interval → is not a gap
 
-> **Règle : `timeBreakdown` ventile la durée totale sans en perdre.**
-> - sur n'importe quel segment, `movingS + stoppedS + gapS` égale l'écart entre le premier et le dernier horodatage
-> - un segment sans arrêt ni coupure → `movingS` égale la durée totale, les deux autres à 0
+> **Rule: `timeBreakdown` allocates the total duration without losing any of it.**
+> - on any segment, `movingS + stoppedS + gapS` equals the gap between the first and last timestamp
+> - a segment with no stop or gap → `movingS` equals the total duration, the other two are 0
 
-> **Question à trancher avant d'écrire le test** : les bornes d'un arrêt appartiennent-elles
-> au temps arrêté ou au temps de mouvement ? Décision retenue : l'intervalle entre deux
-> points tous deux marqués arrêtés compte comme arrêt ; un intervalle entre un point en
-> mouvement et un point arrêté compte comme mouvement. Le temps d'arrêt est ainsi
-> légèrement sous-estimé plutôt que sur-estimé, ce qui évite de gonfler artificiellement la
-> vitesse ascensionnelle.
+> **Question to settle before writing the test**: do the boundaries of a stop belong to the
+> stopped time or the moving time? Decision made: the interval between two
+> points both marked as stopped counts as stopped; an interval between a point in
+> motion and a stopped point counts as moving. Stopped time is thus
+> slightly underestimated rather than overestimated, which avoids artificially inflating the
+> vertical velocity.
 
-- [ ] **Step 1 : Écrire les tests des trois règles, et les voir échouer**
-
-Run: `pnpm test stops`
-
-- [ ] **Step 2 : Implémenter `stops.ts`**
-
-Parcours avant : depuis chaque point candidat, étendre tant que la distance au point d'ancrage reste sous `stopRadiusM` ; si la durée atteinte atteint `stopMinDurationS`, marquer toute la portion et reprendre après elle.
-
-- [ ] **Step 3 : Voir les tests passer**
+- [ ] **Step 1: Write the tests for the three rules, and watch them fail**
 
 Run: `pnpm test stops`
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 2: Implement `stops.ts`**
+
+Forward pass: from each candidate point, extend while the distance to the anchor point stays under `stopRadiusM`; if the duration reached hits `stopMinDurationS`, mark the whole span and resume after it.
+
+- [ ] **Step 3: Watch the tests pass**
+
+Run: `pnpm test stops`
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute la détection des arrêts et la ventilation du temps"
@@ -419,7 +423,7 @@ git add -A && git commit -m "Ajoute la détection des arrêts et la ventilation 
 
 ---
 
-### Task 7 : Découpage des montées
+### Task 7: Climb Splitting
 
 **Files:**
 - Create: `src/analysis/climbs.ts`, `tests/climbs.test.ts`
@@ -436,44 +440,44 @@ git add -A && git commit -m "Ajoute la détection des arrêts et la ventilation 
   ): Segment[];
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-C'est la tâche où le passage des seuils en paramètre porte ses fruits : chaque exemple se
-construit en faisant varier un seuil sur une même donnée.
+This is the task where passing thresholds as parameters pays off: each example
+is built by varying one threshold on the same data.
 
-> **Règle : les suites de points dont l'altitude croît forment les segments candidats.**
-> - un profil en dents de scie de trois montées franches → trois segments
-> - un profil strictement descendant → aucun segment
-> - un profil plat → aucun segment
+> **Rule: sequences of points whose elevation increases form the candidate segments.**
+> - a sawtooth profile with three clear climbs → three segments
+> - a strictly descending profile → no segments
+> - a flat profile → no segments
 
-> **Règle : deux segments voisins fusionnent si le creux qui les sépare est mineur.**
-> - creux de 8 m sur 150 m → fusion, un seul segment
-> - creux de 25 m sur 150 m → pas de fusion, deux segments
-> - creux de 8 m sur 400 m → pas de fusion : c'est la distance qui tranche, pas seulement la perte
-> - trois montées séparées par deux creux mineurs → une seule montée au bout du compte
+> **Rule: two neighboring segments merge if the dip separating them is minor.**
+> - an 8 m dip over 150 m → merge, a single segment
+> - a 25 m dip over 150 m → no merge, two segments
+> - an 8 m dip over 400 m → no merge: it's the distance that decides, not just the loss
+> - three climbs separated by two minor dips → a single climb in the end
 
-> **Règle : un segment n'est retenu que s'il dépasse le gain et la pente minimum.**
-> - montée de 15 m à 5 % → rejetée, gain insuffisant
-> - montée de 20 m à 5 % → retenue, exactement au seuil
-> - montée de 60 m sur 3 km, soit 2 % → retenue, exactement au seuil
-> - montée de 60 m sur 4 km, soit 1,5 % → rejetée, pente insuffisante
+> **Rule: a segment is kept only if it exceeds the minimum gain and grade.**
+> - a 15 m climb at 5% → rejected, insufficient gain
+> - a 20 m climb at 5% → kept, exactly at the threshold
+> - a 60 m climb over 3 km, i.e. 2% → kept, exactly at the threshold
+> - a 60 m climb over 4 km, i.e. 1.5% → rejected, insufficient grade
 
-> **Règle : le dénivelé est mesuré sur l'altitude lissée fournie, la fonction ne lisse pas elle-même.**
-> - appeler avec des altitudes déjà lissées et des altitudes brutes donne des résultats différents, ce qui est attendu
+> **Rule: the elevation gain is measured on the supplied smoothed elevation, the function doesn't smooth it itself.**
+> - calling with already-smoothed elevations versus raw elevations gives different results, which is expected
 
-- [ ] **Step 1 : Écrire les tests des quatre règles, et les voir échouer**
-
-Run: `pnpm test climbs`
-
-- [ ] **Step 2 : Implémenter `climbs.ts`**
-
-Trois passes distinctes et lisibles : repérage des suites croissantes, fusion, filtrage. Ne pas les entremêler.
-
-- [ ] **Step 3 : Voir les tests passer**
+- [ ] **Step 1: Write the tests for the four rules, and watch them fail**
 
 Run: `pnpm test climbs`
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 2: Implement `climbs.ts`**
+
+Three distinct, readable passes: spotting the increasing runs, merging, filtering. Don't interleave them.
+
+- [ ] **Step 3: Watch the tests pass**
+
+Run: `pnpm test climbs`
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le découpage des parties montantes"
@@ -481,21 +485,21 @@ git add -A && git commit -m "Ajoute le découpage des parties montantes"
 
 ---
 
-### Task 8 : Métriques et pipeline d'analyse
+### Task 8: Metrics and Analysis Pipeline
 
 **Files:**
 - Create: `src/analysis/vertical-velocity.ts`, `tests/vertical-velocity.test.ts`
 
 **Interfaces:**
-- Consumes: tout ce qui précède
+- Consumes: everything above
 - Produces:
   ```ts
   export type Climb = {
     startIdx: number;
     endIdx: number;
-    gain: number;                      // mètres
-    distance: number;                  // mètres
-    avgGrade: number;                  // fraction : 0.075 pour 7,5 %
+    gain: number;                      // meters
+    distance: number;                  // meters
+    avgGrade: number;                  // fraction: 0.075 for 7.5%
     movingS: number;
     elapsedS: number;
     verticalVelocityMoving: number;    // m/h
@@ -510,40 +514,40 @@ git add -A && git commit -m "Ajoute le découpage des parties montantes"
   export function analyse(points: Track, t?: Thresholds): Analysis;
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : la vitesse ascensionnelle est le dénivelé divisé par la durée, en m/h.**
-> - 300 m en 30 min sans arrêt → 600 m/h sur les deux mesures
-> - 300 m en 30 min dont 10 min d'arrêt → 900 m/h en mouvement, 600 m/h en total
-> - une montée sans arrêt → les deux mesures sont **égales**, et le test doit le vérifier explicitement
+> **Rule: vertical velocity is the elevation gain divided by the duration, in m/h.**
+> - 300 m in 30 min with no stop → 600 m/h on both measures
+> - 300 m in 30 min including 10 min of stop → 900 m/h moving, 600 m/h total
+> - a climb with no stop → the two measures are **equal**, and the test must verify this explicitly
 
-> **Règle : `analyse` enchaîne les étapes et rend un tout cohérent.**
-> - `cumulative`, `smoothed` et `points` ont la même longueur
-> - chaque `Climb` a `startIdx < endIdx`, tous deux dans les bornes de `points`
-> - les montées sont ordonnées et ne se chevauchent pas
+> **Rule: `analyse` chains the steps and returns a coherent whole.**
+> - `cumulative`, `smoothed`, and `points` have the same length
+> - each `Climb` has `startIdx < endIdx`, both within the bounds of `points`
+> - the climbs are ordered and don't overlap
 
-> **Règle : la fixture réelle sert de test de non-régression à valeurs figées.**
-> - `tests/fixtures/real-file-anonymised.gpx` → trois montées
-> - la première porte un temps d'arrêt non nul et deux vitesses **différentes**
-> - les deux autres portent un temps d'arrêt nul et deux vitesses **égales**
-> - les valeurs exactes sont relevées à la première exécution puis figées, avec un commentaire disant qu'elles décrivent le comportement de l'algorithme et non une vérité de terrain
+> **Rule: the real fixture serves as a regression test with pinned values.**
+> - `tests/fixtures/real-file-anonymised.gpx` → three climbs
+> - the first one carries a nonzero stopped time and two **different** velocities
+> - the other two carry a zero stopped time and two **equal** velocities
+> - the exact values are recorded on the first run and then pinned, with a comment stating that they describe the algorithm's behavior and not ground truth
 
-> **Question à trancher avant d'écrire le test** : que vaut `verticalVelocityMoving` si le
-> temps de mouvement d'une montée est nul — cas théorique d'un segment entièrement couvert
-> par une coupure d'enregistrement ? Décision retenue : rendre `0` plutôt qu'`Infinity`, et
-> couvrir ce cas par un exemple dédié.
+> **Question to settle before writing the test**: what should `verticalVelocityMoving` be if a
+> climb's moving time is zero — the theoretical case of a segment entirely covered
+> by a recording gap? Decision made: return `0` rather than `Infinity`, and
+> cover this case with a dedicated example.
 
-- [ ] **Step 1 : Écrire les tests des trois règles, et les voir échouer**
-
-Run: `pnpm test vertical-velocity`
-
-- [ ] **Step 2 : Implémenter les métriques et `analyse`**
-
-- [ ] **Step 3 : Voir les tests passer, puis figer les valeurs de la fixture réelle**
+- [ ] **Step 1: Write the tests for the three rules, and watch them fail**
 
 Run: `pnpm test vertical-velocity`
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 2: Implement the metrics and `analyse`**
+
+- [ ] **Step 3: Watch the tests pass, then pin the real fixture's values**
+
+Run: `pnpm test vertical-velocity`
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le calcul des vitesses ascensionnelles et le pipeline d'analyse"
@@ -551,19 +555,19 @@ git add -A && git commit -m "Ajoute le calcul des vitesses ascensionnelles et le
 
 ---
 
-### Task 9 : Internationalisation
+### Task 9: Internationalization
 
 **Files:**
 - Create: `src/i18n/index.ts`, `src/i18n/en.ts`, `src/i18n/fr.ts`, `tests/i18n.test.ts`
 
 **Interfaces:**
-- Consumes: rien
+- Consumes: nothing
 - Produces:
   ```ts
   export type Lang = 'en' | 'fr';
   export type MessageKey = keyof typeof import('./en').en;
-  // Le paramètre `stored` est l'injection du stockage : la fonction ne lit ni
-  // navigator ni localStorage, c'est main.ts qui les lui passe.
+  // The `stored` parameter is the storage injection: the function reads
+  // neither navigator nor localStorage, main.ts passes them to it.
   export function detectLanguage(languages: readonly string[], stored: string | null): Lang;
   export type I18n = {
     lang: Lang;
@@ -573,41 +577,41 @@ git add -A && git commit -m "Ajoute le calcul des vitesses ascensionnelles et le
   export function createI18n(lang: Lang): I18n;
   ```
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : la langue vient du choix mémorisé, sinon du navigateur, sinon de l'anglais.**
-> - `['fr-FR', 'en']` sans choix mémorisé → français
-> - `['de-DE']` sans choix mémorisé → anglais, aucune langue connue
-> - `['fr-FR']` avec `'en'` mémorisé → anglais, le choix explicite l'emporte
-> - liste vide → anglais
-> - une valeur mémorisée invalide → anglais, et non une erreur
+> **Rule: the language comes from the stored choice, otherwise from the browser, otherwise English.**
+> - `['fr-FR', 'en']` with no stored choice → French
+> - `['de-DE']` with no stored choice → English, no known language
+> - `['fr-FR']` with `'en'` stored → English, the explicit choice wins
+> - empty list → English
+> - an invalid stored value → English, not an error
 
-> **Règle : les dictionnaires portent exactement les mêmes clés.**
-> - un test compare les jeux de clés de `en` et `fr` et échoue si l'un déborde
-> - ce test est la garantie qu'une chaîne ajoutée d'un côté n'est pas oubliée de l'autre
+> **Rule: the dictionaries carry exactly the same keys.**
+> - a test compares the key sets of `en` and `fr` and fails if one has extra keys
+> - this test guarantees that a string added on one side isn't forgotten on the other
 
-> **Règle : les nombres suivent la locale active.**
-> - `940.5` en anglais → séparateur décimal point
-> - `940.5` en français → séparateur décimal virgule
-> - le test compare à la sortie d'`Intl.NumberFormat`, jamais à une chaîne écrite en dur, afin de ne pas dépendre de la version d'ICU
+> **Rule: numbers follow the active locale.**
+> - `940.5` in English → decimal point separator
+> - `940.5` in French → decimal comma separator
+> - the test compares against `Intl.NumberFormat`'s output, never against a hardcoded string, so as not to depend on the ICU version
 
-- [ ] **Step 1 : Écrire les dictionnaires**
+- [ ] **Step 1: Write the dictionaries**
 
-Toutes les chaînes de l'interface : titres, en-têtes de tableau, libellés d'axes, les six messages d'erreur, le libellé du sélecteur.
+All the interface strings: titles, table headers, axis labels, the six error messages, the selector's label.
 
-- [ ] **Step 2 : Écrire les tests des trois règles, et les voir échouer**
-
-Run: `pnpm test i18n`
-
-- [ ] **Step 3 : Implémenter `i18n/index.ts`**
-
-`detectLanguage` ne lit **pas** `navigator` : elle reçoit la liste. C'est `main.ts` qui la lui passe.
-
-- [ ] **Step 4 : Voir les tests passer**
+- [ ] **Step 2: Write the tests for the three rules, and watch them fail**
 
 Run: `pnpm test i18n`
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 3: Implement `i18n/index.ts`**
+
+`detectLanguage` does **not** read `navigator`: it receives the list. `main.ts` is what passes it.
+
+- [ ] **Step 4: Watch the tests pass**
+
+Run: `pnpm test i18n`
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute l'internationalisation anglais et français"
@@ -615,7 +619,7 @@ git add -A && git commit -m "Ajoute l'internationalisation anglais et français"
 
 ---
 
-### Task 10 : Chargement du fichier et câblage
+### Task 10: File Loading and Wiring
 
 **Files:**
 - Create: `src/ui/dropzone.ts`, `src/ui/language-select.ts`
@@ -631,23 +635,23 @@ git add -A && git commit -m "Ajoute l'internationalisation anglais et français"
   ): void;
   ```
 
-- [ ] **Step 1 : Implémenter la zone de dépôt**
+- [ ] **Step 1: Implement the drop zone**
 
-Clic ouvrant le sélecteur, et gestion de `dragover` / `drop`. Après chargement, la zone se réduit à une ligne portant le nom du fichier et un moyen d'en changer.
+A click opens the file picker, plus handling of `dragover` / `drop`. After loading, the zone shrinks to a line carrying the file name and a way to change it.
 
-- [ ] **Step 2 : Implémenter le sélecteur de langue**
+- [ ] **Step 2: Implement the language selector**
 
-- [ ] **Step 3 : Câbler `main.ts`**
+- [ ] **Step 3: Wire up `main.ts`**
 
-Lecture du fichier, parsing, analyse, rendu. Chaque `GpxError` est traduite par son `code` en message via `t()`, et remplace le graphe : quand le calcul est impossible, on le dit et on n'affiche rien d'autre.
+Reading the file, parsing, analysis, rendering. Each `GpxError` is translated by its `code` into a message via `t()`, and replaces the chart: when the computation is impossible, it's stated and nothing else is displayed.
 
-Une seule exception, qui n'est pas une erreur : **« aucune montée détectée »**. Là le calcul a bien eu lieu et son résultat est vide — le profil est affiché, accompagné de la note correspondante.
+One exception, which isn't an error: **"no climb detected"**. There the computation did take place and its result is empty — the profile is displayed, accompanied by the corresponding note.
 
-- [ ] **Step 4 : Vérifier à la main**
+- [ ] **Step 4: Verify by hand**
 
-`pnpm dev`, charger `tests/fixtures/real-file-anonymised.gpx`, constater l'absence d'erreur de console. Le graphe n'existe pas encore : seul le compte des montées est affiché temporairement.
+`pnpm dev`, load `tests/fixtures/real-file-anonymised.gpx`, confirm there's no console error. The chart doesn't exist yet: only the climb count is temporarily displayed.
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le chargement du fichier et le câblage de la page"
@@ -655,7 +659,7 @@ git add -A && git commit -m "Ajoute le chargement du fichier et le câblage de l
 
 ---
 
-### Task 11 : Profil altimétrique annoté
+### Task 11: Annotated Elevation Profile
 
 **Files:**
 - Create: `src/ui/chart.ts`
@@ -677,23 +681,23 @@ git add -A && git commit -m "Ajoute le chargement du fichier et le câblage de l
   ): ChartHandle;
   ```
 
-- [ ] **Step 1 : Tracer le profil**
+- [ ] **Step 1: Draw the profile**
 
-Courbe remplie de l'altitude **lissée** en fonction de la distance. Axe X en kilomètres, axe Y en mètres, libellés issus d'`i18n`.
+Filled curve of **smoothed** elevation against distance. X axis in kilometers, Y axis in meters, labels sourced from `i18n`.
 
-- [ ] **Step 2 : Ajouter les bandes**
+- [ ] **Step 2: Add the bands**
 
-Une annotation `box` par montée via `chartjs-plugin-annotation`, numérotée, étiquetée `① 940 m/h` avec la vitesse **en mouvement** seule, formatée par `i18n.formatNumber`.
+One `box` annotation per climb via `chartjs-plugin-annotation`, numbered, labeled `① 940 m/h` with the **moving** velocity alone, formatted by `i18n.formatNumber`.
 
-- [ ] **Step 3 : Infobulle et survol**
+- [ ] **Step 3: Tooltip and hover**
 
-L'infobulle d'une bande donne le détail complet de la montée. Le survol appelle `onHoverClimb`, et `highlight()` permet au tableau de piloter la mise en évidence en retour.
+A band's tooltip gives the full detail of the climb. Hovering calls `onHoverClimb`, and `highlight()` lets the table drive the highlighting back.
 
-- [ ] **Step 4 : Vérifier à la main**
+- [ ] **Step 4: Verify by hand**
 
-`pnpm dev` avec la fixture réelle : trois bandes, aux bons endroits, lisibles.
+`pnpm dev` with the real fixture: three bands, in the right places, legible.
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le profil altimétrique et les bandes annotées"
@@ -701,7 +705,7 @@ git add -A && git commit -m "Ajoute le profil altimétrique et les bandes annot�
 
 ---
 
-### Task 12 : Tableau des montées
+### Task 12: Climbs Table
 
 **Files:**
 - Create: `src/ui/table.ts`
@@ -719,21 +723,21 @@ git add -A && git commit -m "Ajoute le profil altimétrique et les bandes annot�
   ): void;
   ```
 
-- [ ] **Step 1 : Construire le tableau**
+- [ ] **Step 1: Build the table**
 
-Colonnes : numéro, altitude départ, altitude arrivée, D+, distance, pente moyenne, temps de mouvement, temps total, vitesse ascensionnelle mouvement, vitesse ascensionnelle totale. Tous les nombres via `i18n.formatNumber`.
+Columns: number, start elevation, end elevation, elevation gain, distance, average grade, moving time, total time, moving vertical velocity, total vertical velocity. All numbers via `i18n.formatNumber`.
 
-- [ ] **Step 2 : Ajouter la ligne de synthèse**
+- [ ] **Step 2: Add the summary row**
 
-Agrégat de l'ensemble des montées : D+ cumulé, distance cumulée, temps cumulés, et les deux vitesses recalculées sur ces totaux — **non** une moyenne des vitesses ligne à ligne, qui serait fausse.
+Aggregate of all the climbs: cumulative elevation gain, cumulative distance, cumulative times, and the two velocities recalculated on these totals — **not** an average of the row-by-row velocities, which would be wrong.
 
-- [ ] **Step 3 : Synchroniser le survol**
+- [ ] **Step 3: Synchronize the hover**
 
-Survoler une ligne appelle `onHoverClimb`, que `main.ts` relaie vers `ChartHandle.highlight`.
+Hovering over a row calls `onHoverClimb`, which `main.ts` relays to `ChartHandle.highlight`.
 
-- [ ] **Step 4 : Vérifier à la main**
+- [ ] **Step 4: Verify by hand**
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute le tableau des montées et la synchronisation du survol"
@@ -741,63 +745,63 @@ git add -A && git commit -m "Ajoute le tableau des montées et la synchronisatio
 
 ---
 
-### Task 13 : Tests d'interface
+### Task 13: Interface Tests
 
 **Files:**
 - Create: `playwright.config.ts`, `tests/e2e/app.spec.ts`, `tests/fixtures/synthetic.gpx`, `tests/fixtures/no-elevation.gpx`
 - Modify: `package.json`
 
 **Interfaces:**
-- Consumes: l'application complète
-- Produces: le script `test:e2e`
+- Consumes: the complete application
+- Produces: the `test:e2e` script
 
-- [ ] **Step 1 : Installer et configurer Playwright**
+- [ ] **Step 1: Install and configure Playwright**
 
-**Déjà fait** : `@playwright/test` 1.62.1 est installé et le navigateur téléchargé.
+**Already done**: `@playwright/test` 1.62.1 is installed and the browser downloaded.
 
 ```bash
 pnpm exec playwright install chromium
 ```
 
-Sans `--with-deps` en local : la machine de développement fait déjà tourner un chromium et un firefox, donc les bibliothèques système sont présentes. Vérifié — le navigateur se lance et `canvas.getContext('2d')` répond, ce dont dépend Chart.js. En CI en revanche, `--with-deps` reste nécessaire : les conteneurs de runner sont nus.
+No `--with-deps` locally: the development machine already runs a chromium and a firefox, so the system libraries are present. Verified — the browser launches and `canvas.getContext('2d')` responds, which is what Chart.js depends on. In CI, however, `--with-deps` remains necessary: the runner containers are bare.
 
-Les navigateurs du système ne sont pas réutilisés directement : le chromium local est un paquet snap, confiné, incapable d'accéder aux profils temporaires que Playwright crée hors de sa cage.
+The system's browsers aren't reused directly: the local chromium is a snap package, sandboxed, unable to access the temporary profiles that Playwright creates outside its cage.
 
-`playwright.config.ts` avec un `webServer` lançant `pnpm dev`.
+`playwright.config.ts` with a `webServer` launching `pnpm dev`.
 
-- [ ] **Step 2 : Écrire la trace synthétique**
+- [ ] **Step 2: Write the synthetic track**
 
-`synthetic.gpx` : montées et arrêts aux valeurs choisies, résultats connus exactement. `no-elevation.gpx` : des `<trkpt>` sans `<ele>`.
+`synthetic.gpx`: climbs and stops at chosen values, exactly known results. `no-elevation.gpx`: `<trkpt>` with no `<ele>`.
 
-**Tests — intention**
+**Tests — intent**
 
-> **Règle : une trace valide produit un graphe et un tableau conformes.**
-> - charger `synthetic.gpx` → le tableau liste le nombre attendu de montées, avec les valeurs attendues
-> - charger `real-file-anonymised.gpx` → trois lignes, la première portant deux vitesses différentes
-> - le canvas du graphe est présent et non vide
+> **Rule: a valid track produces a matching chart and table.**
+> - load `synthetic.gpx` → the table lists the expected number of climbs, with the expected values
+> - load `real-file-anonymised.gpx` → three rows, the first carrying two different velocities
+> - the chart's canvas is present and not empty
 
-> **Règle : une trace inexploitable affiche un message et non un graphe.**
-> - charger `no-elevation.gpx` → le message d'altitude absente s'affiche, le graphe est absent
-> - charger un fichier texte quelconque → le message de GPX invalide s'affiche
+> **Rule: an unusable track displays a message and not a chart.**
+> - load `no-elevation.gpx` → the missing-elevation message is displayed, the chart is absent
+> - load some arbitrary text file → the invalid-GPX message is displayed
 
-> **Règle : le changement de langue réécrit l'affichage sans recharger les données.**
-> - basculer en français → les en-têtes sont traduits et le séparateur décimal devient une virgule
-> - le nombre de lignes du tableau ne change pas
-> - rebasculer en anglais rétablit l'état initial
+> **Rule: changing the language rewrites the display without reloading the data.**
+> - switch to French → the headers are translated and the decimal separator becomes a comma
+> - the number of rows in the table doesn't change
+> - switching back to English restores the initial state
 
-> **Règle : les deux modes de chargement sont équivalents.**
-> - déposer le fichier par glisser-déposer → même tableau qu'en passant par le sélecteur
+> **Rule: the two loading modes are equivalent.**
+> - drop the file via drag-and-drop → the same table as when going through the file picker
 
-> **Règle : le survol relie les deux vues.**
-> - survoler une ligne du tableau → la bande correspondante change d'aspect
+> **Rule: hovering links the two views.**
+> - hover over a table row → the corresponding band changes appearance
 
-- [ ] **Step 3 : Écrire les tests des cinq règles, et les voir échouer ou passer selon l'état de l'application**
+- [ ] **Step 3: Write the tests for the five rules, and watch them fail or pass depending on the application's state**
 
 Run: `pnpm test:e2e`
 
-- [ ] **Step 4 : Corriger l'application jusqu'au vert**
+- [ ] **Step 4: Fix the application until green**
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute les tests d'interface Playwright"
@@ -805,37 +809,37 @@ git add -A && git commit -m "Ajoute les tests d'interface Playwright"
 
 ---
 
-### Task 14 : Intégration continue et publication
+### Task 14: Continuous Integration and Publishing
 
 **Files:**
 - Create: `.github/workflows/deploy.yml`, `.gitlab-ci.yml`, `knip.json`
 - Modify: `README.md`
 
 **Interfaces:**
-- Consumes: tous les scripts de `package.json`
-- Produces: rien pour le code
+- Consumes: all the scripts in `package.json`
+- Produces: nothing for the code
 
-- [ ] **Step 1 : Écrire le workflow GitHub**
+- [ ] **Step 1: Write the GitHub workflow**
 
-Corepack, `pnpm install --frozen-lockfile`, puis `lint`, `typecheck`, `test`, installation du navigateur, `test:e2e`, `build`, publication via `actions/deploy-pages`. Déclenché sur la branche principale.
+Corepack, `pnpm install --frozen-lockfile`, then `lint`, `typecheck`, `test`, browser installation, `test:e2e`, `build`, publishing via `actions/deploy-pages`. Triggered on the main branch.
 
-- [ ] **Step 2 : Écrire `.gitlab-ci.yml`**
+- [ ] **Step 2: Write `.gitlab-ci.yml`**
 
-Même enchaînement. GitLab exige que l'artefact publié se nomme `public/` : le job copie `dist/` vers `public/` après le build.
+Same sequence. GitLab requires the published artifact to be named `public/`: the job copies `dist/` to `public/` after the build.
 
-- [ ] **Step 3 : Configurer knip et vérifier**
+- [ ] **Step 3: Configure knip and verify**
 
-Run: `pnpm knip` — aucun export ni dépendance orpheline.
+Run: `pnpm knip` — no orphaned export or dependency.
 
-- [ ] **Step 4 : Écrire le README**
+- [ ] **Step 4: Write the README**
 
-Ce que fait la page, comment la lancer, comment lancer les tests, et le rappel que les seuils vivent dans `src/constants.ts`.
+What the page does, how to run it, how to run the tests, and a reminder that the thresholds live in `src/constants.ts`.
 
-- [ ] **Step 5 : Vérifier la chaîne complète**
+- [ ] **Step 5: Verify the full chain**
 
 Run: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`
 
-- [ ] **Step 6 : Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute l'intégration continue et la publication sur Pages"
@@ -843,24 +847,24 @@ git add -A && git commit -m "Ajoute l'intégration continue et la publication su
 
 ---
 
-### Task 15 : Validation sur trace réelle
+### Task 15: Validation on Real Track
 
 **Files:**
-- Modify: `src/constants.ts` si un seuil doit bouger
+- Modify: `src/constants.ts` if a threshold needs to move
 
-- [ ] **Step 1 : Examiner le résultat sur la fixture réelle**
+- [ ] **Step 1: Examine the result on the real fixture**
 
-`pnpm dev`, charger `tests/fixtures/real-file-anonymised.gpx`, et confronter les trois montées détectées au profil affiché : les bandes couvrent-elles ce que l'œil identifie comme des montées, ni plus ni moins ?
+`pnpm dev`, load `tests/fixtures/real-file-anonymised.gpx`, and check the three detected climbs against the displayed profile: do the bands cover what the eye identifies as climbs, no more and no less?
 
-- [ ] **Step 2 : Éprouver `stopRadiusM`**
+- [ ] **Step 2: Stress-test `stopRadiusM`**
 
-C'est le seuil le plus discutable des neuf. Comparer le temps d'arrêt de la première montée à ce que le profil suggère. Si de la progression lente est comptée comme arrêt, descendre à 4 m et réexécuter.
+This is the most debatable of the nine thresholds. Compare the first climb's stopped time to what the profile suggests. If slow progress is being counted as a stop, lower it to 4 m and rerun.
 
-- [ ] **Step 3 : Ajuster et figer**
+- [ ] **Step 3: Adjust and pin**
 
-Tout seuil modifié voit son commentaire mis à jour dans `constants.ts`, et les valeurs figées du test de non-régression recalculées.
+Any modified threshold has its comment updated in `constants.ts`, and the pinned values of the regression test recalculated.
 
-- [ ] **Step 4 : Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add -A && git commit -m "Ajuste les seuils après validation sur trace réelle"
@@ -868,62 +872,62 @@ git add -A && git commit -m "Ajuste les seuils après validation sur trace réel
 
 ---
 
-### Task 16 : Tests de mutation
+### Task 16: Mutation Testing
 
 **Files:**
 - Create: `stryker.config.json`
 - Modify: `package.json`, `.github/workflows/deploy.yml`, `.gitlab-ci.yml`
 
 **Interfaces:**
-- Consumes: la suite Vitest complète
-- Produces: le script `test:mutation`
+- Consumes: the complete Vitest suite
+- Produces: the `test:mutation` script
 
-Cette tâche vient **en dernier**, une fois l'analyse entièrement écrite et couverte par ses
-propriétés. Stryker altère le code source — inverse une comparaison, décale une borne,
-remplace une constante par zéro — puis relance les tests sur chaque variante. Un mutant qui
-survit désigne une ligne que rien ne vérifie vraiment.
+This task comes **last**, once the analysis is fully written and covered by its
+properties. Stryker alters the source code — flips a comparison, shifts a
+boundary, replaces a constant with zero — then reruns the tests on each variant. A
+surviving mutant points to a line that nothing truly verifies.
 
-C'est l'outil qui dit si les seuils sont réellement testés : remplacer `>= 20` par `> 20`
-dans le filtrage des montées doit faire échouer un test, sinon l'exemple « montée de 20 m
-retenue, exactement au seuil » ne prouve rien.
+This is the tool that tells whether the thresholds are really tested: replacing `>= 20`
+with `> 20` in the climb filtering must fail a test, otherwise the example "a 20 m
+climb kept, exactly at the threshold" proves nothing.
 
-- [ ] **Step 1 : Installer et configurer**
+- [ ] **Step 1: Install and configure**
 
 ```bash
 pnpm add -D @stryker-mutator/core @stryker-mutator/vitest-runner
 ```
 
-`stryker.config.json` limité à `src/analysis/**` et `src/gpx/**` : le cœur du calcul. Les
-modules `ui/` sont couverts par Playwright, que Stryker ne sait pas piloter, et les muter ne
-produirait que du bruit.
+`stryker.config.json` limited to `src/analysis/**` and `src/gpx/**`: the core of the
+computation. The `ui/` modules are covered by Playwright, which Stryker can't
+drive, and mutating them would only produce noise.
 
-- [ ] **Step 2 : Établir la référence**
+- [ ] **Step 2: Establish the baseline**
 
-Lancer `pnpm test:mutation`, relever le score obtenu et la liste des mutants survivants. Ne
-pas fixer de seuil avant d'avoir vu ce chiffre : un seuil décidé d'avance est soit trivial à
-atteindre, soit arbitrairement punitif.
+Run `pnpm test:mutation`, record the resulting score and the list of surviving
+mutants. Don't set a threshold before seeing this number: a threshold decided in
+advance is either trivial to reach or arbitrarily punitive.
 
-- [ ] **Step 3 : Traiter les survivants**
+- [ ] **Step 3: Deal with the survivors**
 
-Pour chaque mutant survivant, trancher entre deux cas et l'écrire :
+For each surviving mutant, decide between two cases and write it down:
 
-- **le test manque** — la mutation change un comportement qui compte, et rien ne le voit.
-  Ajouter l'exemple ou la propriété qui l'attrape.
-- **la mutation est inoffensive** — elle porte sur un détail sans conséquence observable
-  (une borne stricte ou large là où aucune donnée réelle ne tombe pile dessus). L'exclure
-  explicitement, avec le commentaire disant pourquoi.
+- **the test is missing** — the mutation changes a behavior that matters, and nothing sees it.
+  Add the example or property that catches it.
+- **the mutation is harmless** — it concerns a detail with no observable consequence
+  (a strict or loose boundary where no real data ever lands exactly on it). Exclude it
+  explicitly, with a comment stating why.
 
-Ne jamais écrire un test dans le seul but de tuer un mutant : un test qui ne décrit aucun
-comportement voulu est du poids mort qui affiche un bon score.
+Never write a test with the sole purpose of killing a mutant: a test that describes no
+intended behavior is dead weight that displays a good score.
 
-- [ ] **Step 4 : Fixer le seuil et brancher la CI**
+- [ ] **Step 4: Set the threshold and wire up the CI**
 
-`thresholds.break` réglé légèrement sous le score constaté, pour attraper une régression
-sans faire échouer la CI au premier arrondi. Le job est **séparé et non bloquant pour la
-publication** : Stryker relance la suite des centaines de fois, il n'a pas sa place sur le
-chemin critique d'un déploiement.
+`thresholds.break` set slightly below the observed score, to catch a regression
+without failing the CI on the first rounding. The job is **separate and non-blocking for the
+publication**: Stryker reruns the suite hundreds of times, it has no place on the
+critical path of a deployment.
 
-- [ ] **Step 5 : Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "Ajoute les tests de mutation"
