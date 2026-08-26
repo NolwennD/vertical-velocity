@@ -11,17 +11,25 @@ Tout s'exécute dans le navigateur. Aucune trace ne part sur le réseau.
 ## Commandes
 
 ```bash
-pnpm dev            # serveur de développement
-pnpm test           # suite complète
-pnpm test:related   # seuls les tests important les fichiers passés en argument
-pnpm typecheck      # tsc --noEmit
-pnpm lint           # biome check
-pnpm format         # biome format --write
-pnpm build          # dist/
+pnpm check          # LA commande de vérification : tsc → biome → vitest → stryker
 ```
 
+`check` enchaîne les quatre contrôles **dans cet ordre**, du plus rapide et du plus
+informatif au plus lent, et s'arrête au premier échec. L'ordre n'est pas indifférent : un
+type qui ne compile pas rend les autres verdicts sans valeur, et Stryker relance la suite
+des centaines de fois — le faire tourner avant d'avoir un vert stable est du temps perdu.
+
+Les mêmes contrôles séparément, quand on cherche un point précis :
+
 ```bash
+pnpm typecheck      # tsc --noEmit
+pnpm lint           # biome check
+pnpm test           # suite complète
 pnpm test:mutation  # Stryker : mesure ce que les tests attrapent vraiment
+pnpm test:related   # seuls les tests important les fichiers passés en argument
+pnpm format         # biome format --write
+pnpm dev            # serveur de développement
+pnpm build          # dist/
 ```
 
 Gestionnaire : **pnpm** (figé par `packageManager`). Jamais `npm` ni `yarn`.
@@ -91,15 +99,26 @@ distincts par cycle, puis un commit :
 1. **test** — écrit le test, constate le rouge, rapporte l'échec réel. Ne touche pas à `src/`.
 2. **code** — écrit le minimum pour le vert. Ne touche pas à `tests/`. Si le test lui paraît
    faux, il s'arrête et le signale au lieu de le corriger.
-3. **ponytail** — relit avec la skill `ponytail:ponytail-review`. **Ses recommandations non
-   ambiguës sont appliquées**, pas seulement proposées ; en écarter une demande une
-   justification explicite.
+3. **ponytail** — relit avec la skill `ponytail:ponytail-review` et **rend un rapport, rien
+   de plus**. Cette skill est conçue pour ne rien modifier : à la fin de son passage,
+   `git diff` doit être identique à ce qu'il était avant. Un agent ponytail qui a écrit dans
+   des fichiers a détourné son rôle.
+4. **code, à nouveau** — applique les recommandations du rapport. **Les recommandations non
+   ambiguës sont appliquées**, pas seulement lues ; en écarter une demande une justification
+   explicite. Chaque modification relance aussitôt les tests impactés : une simplification
+   qui casse le vert est une simplification à revoir.
+
+Séparer la relecture de son application n'est pas une formalité. Celui qui relit cherche ce
+qui cloche sans avoir à défendre son propre code ; celui qui applique juge chaque
+proposition sur pièce au lieu de l'exécuter. Un même agent qui relit et corrige tend à
+justifier ce qu'il vient d'écrire.
 
 Ce qui est ambigu ne se tranche pas dans l'urgence : laisser un commentaire
 `// ponytail: <question ouverte>` à l'endroit concerné. `/ponytail-debt` les récolte ensuite.
 
 **Toute modification de code relance immédiatement les tests impactés**
-(`pnpm test:related <fichier>`). La suite complète tourne une fois par cycle, avant le commit.
+(`pnpm test:related <fichier>`). En fin de cycle, avant le commit, `pnpm check` passe en
+entier.
 
 Aucun agent ne déclare un état sans l'avoir constaté : le rouge comme le vert se rapportent
 avec la sortie réelle de la commande.
