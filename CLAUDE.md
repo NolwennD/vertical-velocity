@@ -96,9 +96,26 @@ Trois réglages non évidents dans `stryker.config.json`, chacun pour une raison
 L'unité de travail est **une règle**, pas une tâche ni un exemple isolé. Trois agents
 distincts par cycle, puis un commit :
 
-1. **test** — écrit le test, constate le rouge, rapporte l'échec réel. Ne touche pas à `src/`.
-2. **code** — écrit le minimum pour le vert. Ne touche pas à `tests/`. Si le test lui paraît
-   faux, il s'arrête et le signale au lieu de le corriger.
+1. **test** — **modélise d'abord le problème par des types**, puis écrit le test, constate le
+   rouge et rapporte l'échec réel.
+
+   Les types font partie de l'énoncé, pas de la solution : déclarer que `Track` a au moins
+   deux points, c'est dire ce qui est valide, exactement le travail de celui qui spécifie. Et
+   l'on n'écrit pas un test sans le vocabulaire qu'il parle — il est donc normal que les
+   types précèdent le test.
+
+   **La frontière : ce qui disparaît à la compilation appartient à l'agent test, ce qui
+   existe à l'exécution appartient à l'agent code.** Alias de types, interfaces, unions,
+   tuples, signatures : au test. Corps de fonction, corps de classe, valeur, constante,
+   algorithme : au code. Le critère est vérifiable sans discussion — il suffit de se demander
+   si la chose subsiste dans le JavaScript produit.
+
+   Un rouge de typage est un rouge légitime : rendre un état absurde inexprimable fait
+   échouer `tsc`, et c'est ce qui force le changement.
+
+2. **code** — écrit le minimum pour le vert. Ne touche pas à `tests/`, ni aux types posés par
+   l'agent test : ce sont son énoncé. Si le test ou un type lui paraît faux, il s'arrête et le
+   signale au lieu de le corriger.
 3. **ponytail** — relit avec la skill `ponytail:ponytail-review` et **rend un rapport, rien
    de plus**. Cette skill est conçue pour ne rien modifier : à la fin de son passage,
    `git diff` doit être identique à ce qu'il était avant. Un agent ponytail qui a écrit dans
