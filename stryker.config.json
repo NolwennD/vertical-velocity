@@ -8,5 +8,8 @@
   "tsconfigFile": "tsconfig.stryker-noop.json",
   "mutate": ["src/analysis/**/*.ts", "src/gpx/**/*.ts"],
   "reporters": ["progress", "clear-text", "html"],
-  "htmlReporter": { "fileName": "reports/mutation.html" }
+  "htmlReporter": { "fileName": "reports/mutation.html" },
+  "typescriptChecker": {
+    "experimentalNativePreview": true
+  }
 }
