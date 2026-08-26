@@ -26,15 +26,25 @@ pnpm test:mutation  # Stryker : mesure ce que les tests attrapent vraiment
 
 Gestionnaire : **pnpm** (figé par `packageManager`). Jamais `npm` ni `yarn`.
 
-**TypeScript reste sur la ligne 5.x.** La 7 est le portage natif : elle n'expose plus l'API
-compilateur JavaScript — ni `createProgram`, ni `readConfigFile`, ni
-`parseConfigFileTextToJson` — et tout outil qui pilote TypeScript par cette API casse dessus,
-Stryker le premier. Nous n'employons `tsc` qu'en ligne de commande, donc la 7 ne nous
-apporterait rien en échange.
+**TypeScript 7**, le portage natif. À savoir avant d'ajouter un outil : elle n'expose plus
+l'API compilateur JavaScript — ni `createProgram`, ni `readConfigFile`, ni
+`parseConfigFileTextToJson`. `tsc` en ligne de commande fonctionne normalement, mais tout
+outil qui pilote TypeScript par son API échoue avec un `TypeError: ... is not a function`.
+Si un outil casse de cette façon, c'est la première piste.
 
-Deux réglages non évidents dans `stryker.config.json` : `plugins` déclare explicitement
-`@stryker-mutator/vitest-runner`, que l'arborescence stricte de pnpm empêche Stryker de
-découvrir seul.
+Trois réglages non évidents dans `stryker.config.json`, chacun pour une raison précise :
+
+- `plugins` déclare explicitement `@stryker-mutator/vitest-runner` : l'arborescence stricte
+  de pnpm empêche Stryker de le découvrir seul.
+- `tsconfigFile` pointe vers `tsconfig.stryker-noop.json`, **qui n'existe pas volontairement**.
+  Le préprocesseur de Stryker ne sert qu'à réécrire les chemins `extends` et `references`
+  d'un tsconfig quand ils sortent du bac à sable ; notre tsconfig n'a ni l'un ni l'autre, il
+  n'a donc rien à faire. Ne lui donner aucun fichier le court-circuite — et évite ainsi
+  l'appel à l'API compilateur que TypeScript 7 ne fournit plus. Si un `extends` ou un
+  `references` apparaît un jour dans `tsconfig.json`, ce contournement devra être revu.
+- `cleanTempDir: "always"` supprime le bac à sable après chaque exécution. Sans lui, vitest
+  y retrouve une copie des tests et les compte deux fois — silencieusement, puisqu'ils
+  passent. `vite.config.ts` exclut le dossier pour la même raison, en défense de plus.
 
 ## Règles de code
 
