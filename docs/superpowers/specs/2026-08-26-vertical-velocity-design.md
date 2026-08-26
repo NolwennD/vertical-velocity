@@ -306,7 +306,7 @@ Chaque cas affiche un message explicite à la place du graphe.
 | Le fichier n'est pas du XML, ou pas un GPX | Message « fichier GPX invalide » |
 | Aucun `<trkpt>` | Message « aucun point de trace » — cas des GPX ne contenant qu'un `<rte>` |
 | Aucun `<ele>` | Message « altitude absente » — fréquent sur les traces de planificateurs |
-| Aucun `<time>` | Le profil est affiché, sans bandes ni tableau, avec une note indiquant que la vitesse est incalculable sans horodatage |
+| Aucun `<time>` | Message « horodatage absent ». Sans temps, aucune vitesse n'est calculable : on ne montre rien plutôt qu'un profil qui laisserait croire à une analyse |
 | Aucune montée au-dessus des seuils | Le profil est affiché, avec une note indiquant qu'aucune montée d'au moins 20 m n'a été trouvée |
 | Points isolés sans altitude ou sans heure | Ignorés silencieusement |
 

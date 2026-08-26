@@ -14,4 +14,5 @@ playwright-report/
 
 # Réglages locaux de l'éditeur et de l'outillage
 .claude/settings.local.json
+.claude/settings.local.json.tmp.*
 *.local
