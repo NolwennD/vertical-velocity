@@ -20,7 +20,21 @@ pnpm format         # biome format --write
 pnpm build          # dist/
 ```
 
+```bash
+pnpm test:mutation  # Stryker : mesure ce que les tests attrapent vraiment
+```
+
 Gestionnaire : **pnpm** (figé par `packageManager`). Jamais `npm` ni `yarn`.
+
+**TypeScript reste sur la ligne 5.x.** La 7 est le portage natif : elle n'expose plus l'API
+compilateur JavaScript — ni `createProgram`, ni `readConfigFile`, ni
+`parseConfigFileTextToJson` — et tout outil qui pilote TypeScript par cette API casse dessus,
+Stryker le premier. Nous n'employons `tsc` qu'en ligne de commande, donc la 7 ne nous
+apporterait rien en échange.
+
+Deux réglages non évidents dans `stryker.config.json` : `plugins` déclare explicitement
+`@stryker-mutator/vitest-runner`, que l'arborescence stricte de pnpm empêche Stryker de
+découvrir seul.
 
 ## Règles de code
 

@@ -16,3 +16,10 @@ playwright-report/
 .claude/settings.local.json
 .claude/settings.local.json.tmp.*
 *.local
+
+# Sorties Stryker
+.stryker-tmp/
+reports/
+
+# IDE
+.idea/
