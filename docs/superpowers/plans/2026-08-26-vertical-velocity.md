@@ -6,7 +6,7 @@
 
 **Architecture :** tout s'exécute dans le navigateur. Le parsing est isolé derrière un adaptateur ; l'analyse est une suite de fonctions pures recevant leurs seuils en paramètre ; seuls `main.ts` et `ui/` touchent au DOM.
 
-**Tech Stack :** Vite, TypeScript, Chart.js + chartjs-plugin-annotation, @tmcw/togeojson, Vitest, Playwright, Biome, lefthook, pnpm.
+**Tech Stack :** Vite, TypeScript, Chart.js + chartjs-plugin-annotation, @tmcw/togeojson, Vitest, fast-check, Playwright, Biome, lefthook, Stryker, pnpm.
 
 **Spec :** [`docs/superpowers/specs/2026-08-26-vertical-velocity-design.md`](../specs/2026-08-26-vertical-velocity-design.md)
 
@@ -20,6 +20,7 @@
 - Tout nombre affiché passe par **`Intl.NumberFormat`** avec la locale active. Jamais de concaténation.
 - **Aucune lecture de variable globale enfouie dans la logique.** Ce qui vient de l'extérieur entre par un paramètre : parseur, `navigator.languages`, stockage, seuils.
 - Les fonctions d'analyse reçoivent les seuils en **paramètre à valeur par défaut** : `f(..., t: Thresholds = DEFAULTS)`.
+- **Éviter la mutation autant que possible.** Les données arrivent propres du parsing, et l'analyse les transforme sans les altérer. En particulier, jamais d'effet de bord dans un `map`, un `filter` ou un `reduce` : ces fonctions transforment, elles n'accumulent pas dans leur fermeture. Là où un parcours linéaire est indispensable — une somme courante ne s'écrit pas en O(n) sans accumulateur — la mutation reste **locale à la fonction**, sur une variable qui ne sort jamais de sa portée, et la fonction demeure pure vue du dehors.
 - `vite.config.ts` avec **`base: './'`**.
 - Langue par défaut : **anglais**.
 - Commits en français, à l'auteur du dépôt, **sans ligne de co-auteur**.
@@ -53,6 +54,28 @@ concrets à couvrir. Les questions ouvertes sont signalées et doivent être tra
 d'écrire le test, pas pendant.
 
 L'implémenteur écrit les assertions lui-même, en respectant le cycle décrit ci-dessous.
+
+### Chercher les propriétés avant les exemples
+
+Pour chaque règle, se demander d'abord s'il existe un **invariant** vrai sur toutes les
+entrées, et non seulement sur les trois cas choisis. Une propriété se vérifie avec
+**fast-check**, qui engendre des centaines d'entrées et réduit automatiquement le
+contre-exemple quand elle tombe en défaut.
+
+Exemples d'invariants du domaine : une distance est toujours positive ou nulle ; elle ne
+dépend pas de l'ordre des arguments ; des distances cumulées sont croissantes et de même
+longueur que l'entrée ; un lissage ne change jamais le nombre de points ; la somme des temps
+de mouvement, d'arrêt et de coupure égale toujours la durée totale.
+
+Les exemples chiffrés restent nécessaires — ils ancrent les valeurs concrètes, et une
+propriété seule passerait sur une implémentation qui rend systématiquement zéro. Les deux se
+complètent : **la propriété dit ce qui est toujours vrai, l'exemple dit ce qui est vrai
+ici**. L'ordre de recherche compte : chercher la propriété d'abord fait souvent découvrir
+que trois exemples en couvraient un seul cas.
+
+Les tests de mutation (Stryker, tâche 16) viennent **après**, jamais avant : ils mesurent la
+force des tests existants. Les y soumettre sans avoir cherché les invariants reviendrait à
+mesurer une faiblesse déjà connue.
 
 ## Méthode d'exécution : TDD en ping-pong
 
@@ -895,4 +918,67 @@ Tout seuil modifié voit son commentaire mis à jour dans `constants.ts`, et les
 
 ```bash
 git add -A && git commit -m "Ajuste les seuils après validation sur trace réelle"
+```
+
+---
+
+### Task 16 : Tests de mutation
+
+**Files:**
+- Create: `stryker.config.json`
+- Modify: `package.json`, `.github/workflows/deploy.yml`, `.gitlab-ci.yml`
+
+**Interfaces:**
+- Consumes: la suite Vitest complète
+- Produces: le script `test:mutation`
+
+Cette tâche vient **en dernier**, une fois l'analyse entièrement écrite et couverte par ses
+propriétés. Stryker altère le code source — inverse une comparaison, décale une borne,
+remplace une constante par zéro — puis relance les tests sur chaque variante. Un mutant qui
+survit désigne une ligne que rien ne vérifie vraiment.
+
+C'est l'outil qui dit si les seuils sont réellement testés : remplacer `>= 20` par `> 20`
+dans le filtrage des montées doit faire échouer un test, sinon l'exemple « montée de 20 m
+retenue, exactement au seuil » ne prouve rien.
+
+- [ ] **Step 1 : Installer et configurer**
+
+```bash
+pnpm add -D @stryker-mutator/core @stryker-mutator/vitest-runner
+```
+
+`stryker.config.json` limité à `src/analysis/**` et `src/gpx/**` : le cœur du calcul. Les
+modules `ui/` sont couverts par Playwright, que Stryker ne sait pas piloter, et les muter ne
+produirait que du bruit.
+
+- [ ] **Step 2 : Établir la référence**
+
+Lancer `pnpm test:mutation`, relever le score obtenu et la liste des mutants survivants. Ne
+pas fixer de seuil avant d'avoir vu ce chiffre : un seuil décidé d'avance est soit trivial à
+atteindre, soit arbitrairement punitif.
+
+- [ ] **Step 3 : Traiter les survivants**
+
+Pour chaque mutant survivant, trancher entre deux cas et l'écrire :
+
+- **le test manque** — la mutation change un comportement qui compte, et rien ne le voit.
+  Ajouter l'exemple ou la propriété qui l'attrape.
+- **la mutation est inoffensive** — elle porte sur un détail sans conséquence observable
+  (une borne stricte ou large là où aucune donnée réelle ne tombe pile dessus). L'exclure
+  explicitement, avec le commentaire disant pourquoi.
+
+Ne jamais écrire un test dans le seul but de tuer un mutant : un test qui ne décrit aucun
+comportement voulu est du poids mort qui affiche un bon score.
+
+- [ ] **Step 4 : Fixer le seuil et brancher la CI**
+
+`thresholds.break` réglé légèrement sous le score constaté, pour attraper une régression
+sans faire échouer la CI au premier arrondi. Le job est **séparé et non bloquant pour la
+publication** : Stryker relance la suite des centaines de fois, il n'a pas sa place sur le
+chemin critique d'un déploiement.
+
+- [ ] **Step 5 : Commit**
+
+```bash
+git add -A && git commit -m "Ajoute les tests de mutation"
 ```

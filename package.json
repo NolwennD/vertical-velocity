@@ -24,6 +24,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",
     "@playwright/test": "^1.62.1",
+    "fast-check": "^4.9.0",
     "knip": "^6.32.2",
     "lefthook": "^2.1.10",
     "typescript": "^7.0.2",

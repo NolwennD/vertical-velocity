@@ -331,7 +331,29 @@ vérification de types et les tests restent lancés à la main pendant le dével
 façon systématique en CI. Un commit reste ainsi instantané, tout en gardant un dépôt dont
 le formatage ne bouge jamais.
 
-### Tests unitaires (Vitest)
+**Mutation** : le code de l'analyse évite la mutation. Les données arrivent propres du
+parsing et sont transformées sans être altérées ; aucun effet de bord dans un `map`, un
+`filter` ou un `reduce`. Là où un parcours linéaire l'impose — une somme courante ne s'écrit
+pas en O(n) sans accumulateur — la mutation reste locale à la fonction, qui demeure pure vue
+du dehors.
+
+### Tests unitaires (Vitest et fast-check)
+
+Chaque règle est d'abord examinée sous l'angle de l'**invariant** : existe-t-il quelque
+chose de vrai sur toutes les entrées, et pas seulement sur les trois exemples retenus ?
+`fast-check` engendre alors des centaines d'entrées et réduit le contre-exemple quand la
+propriété tombe. Les exemples chiffrés restent nécessaires : la propriété dit ce qui est
+toujours vrai, l'exemple dit ce qui est vrai ici, et une propriété seule passerait sur une
+implémentation qui rend systématiquement zéro.
+
+### Tests de mutation (Stryker)
+
+Lancés en dernier, une fois l'analyse couverte par ses propriétés, et hors du chemin
+critique de publication. Stryker altère le code — inverse une comparaison, décale une borne
+— et relance les tests : un mutant survivant désigne une ligne que rien ne vérifie. C'est ce
+qui dit si les seuils sont réellement testés.
+
+### Détail des tests unitaires
 
 Un fichier par module d'analyse, sur des traces synthétiques construites à la main.
 
