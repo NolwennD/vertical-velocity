@@ -52,8 +52,46 @@ l'example mapping. La règle énonce le comportement attendu ; les exemples donn
 concrets à couvrir. Les questions ouvertes sont signalées et doivent être tranchées avant
 d'écrire le test, pas pendant.
 
-L'implémenteur écrit les assertions lui-même, en respectant le cycle : test rouge d'abord,
-implémentation minimale ensuite, test vert, commit.
+L'implémenteur écrit les assertions lui-même, en respectant le cycle décrit ci-dessous.
+
+## Méthode d'exécution : TDD en ping-pong
+
+**L'unité de travail est une règle**, pas une tâche entière ni un exemple isolé. Les
+exemples d'une règle forment les cas d'un même bloc de test : ils décrivent un seul
+comportement et n'ont pas de sens séparés. Une tâche de quatre règles donne donc quatre
+cycles.
+
+Chaque cycle enchaîne trois agents distincts, puis un commit :
+
+**1. Agent « test »** — écrit le test de la règle courante, à partir de ses exemples, et le
+lance. Il doit constater le **rouge** et rapporter le message d'échec réel. Il ne touche pas
+à `src/`. Un test qui passe du premier coup est un test qui ne prouve rien : il faut alors
+comprendre pourquoi avant d'avancer.
+
+**2. Agent « code »** — écrit le minimum nécessaire pour passer au **vert**. Il ne modifie
+aucun test. C'est cette séparation qui fait le ping-pong : celui qui écrit le code ne peut
+pas se faciliter la tâche en amendant l'attente.
+
+**3. Agent « ponytail »** — relit la paire test + code avec la skill `ponytail-review`,
+centrée sur la sur-ingénierie : abstraction spéculative, code qui réinvente la bibliothèque
+standard, souplesse dont personne n'a besoin. Ses propositions claires sont appliquées
+immédiatement. **Ce qui est ambigu ne se tranche pas dans l'urgence** : l'agent laisse un
+commentaire `ponytail:` à l'endroit concerné, qui documente la question et le choix
+provisoire.
+
+**4. Commit** — après vérification que la suite complète est verte et que `pnpm lint` et
+`pnpm typecheck` passent. Puis règle suivante.
+
+### Conventions
+
+- Les notes différées prennent la forme `// ponytail: <la question laissée ouverte>`. La
+  commande `/ponytail-debt` les récolte ensuite en registre, pour que « plus tard » ne
+  devienne pas « jamais ».
+- Aucun agent ne déclare un état sans l'avoir constaté : le rouge comme le vert se
+  rapportent avec la sortie réelle de la commande, jamais de mémoire.
+- Un cycle qui déborde — la règle se révèle plus grosse qu'annoncée — se scinde plutôt que
+  de s'étirer. Mieux vaut deux cycles courts qu'un cycle où le rouge et le vert sont
+  distants de vingt minutes.
 
 ---
 
