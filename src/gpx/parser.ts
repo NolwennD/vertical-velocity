@@ -2,7 +2,7 @@ export type TrackPoint = {
   lat: number;
   lon: number;
   ele: number;
-  time: Date;
+  time: Temporal.Instant;
 };
 
 export type Track = readonly [TrackPoint, TrackPoint, ...TrackPoint[]];

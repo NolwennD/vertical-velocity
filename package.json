@@ -28,6 +28,8 @@
     "@playwright/test": "^1.62.1",
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@types/geojson": "^7946.0.16",
+    "@xmldom/xmldom": "^0.9.12",
     "fast-check": "^4.9.0",
     "knip": "^6.32.2",
     "lefthook": "^2.1.10",

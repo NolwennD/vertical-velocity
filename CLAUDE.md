@@ -70,6 +70,11 @@ Three non-obvious settings in `stryker.config.json`, each for a specific reason:
   mutation stays local to the function, which remains pure from the outside. And never a
   quadratic version in the name of purity: `[...acc, x]` inside a `reduce` is
   unacceptable over tens of thousands of points.
+- **Dates and durations go through `Temporal`**, never through `Date`. `Temporal.Instant` for
+  a point in time, `Temporal.Duration` for an elapsed span. `Date` has no duration type, so
+  every interval ends up as a bare number of milliseconds whose unit lives only in a variable
+  name — exactly the kind of implicit contract this codebase avoids. Supported by every
+  target engine except Safari, which is an accepted limitation.
 - **No reading of a global variable buried inside the logic.** Anything coming from the
   outside enters through a parameter: parser, `navigator.languages`, storage, thresholds.
 - **Thresholds are a parameter with a default value**: `f(..., t: Thresholds =
