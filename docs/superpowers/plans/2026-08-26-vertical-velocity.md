@@ -74,13 +74,39 @@ pas se faciliter la tâche en amendant l'attente.
 
 **3. Agent « ponytail »** — relit la paire test + code avec la skill `ponytail-review`,
 centrée sur la sur-ingénierie : abstraction spéculative, code qui réinvente la bibliothèque
-standard, souplesse dont personne n'a besoin. Ses propositions claires sont appliquées
-immédiatement. **Ce qui est ambigu ne se tranche pas dans l'urgence** : l'agent laisse un
-commentaire `ponytail:` à l'endroit concerné, qui documente la question et le choix
-provisoire.
+standard, souplesse dont personne n'a besoin.
+
+**Toute recommandation non ambiguë est appliquée avant le commit.** Ce n'est pas une revue
+consultative : une proposition claire et non appliquée doit être justifiée explicitement,
+sinon elle est mise en œuvre. Chaque modification issue de la relecture relance les tests
+impactés — une simplification qui casse le vert est une simplification à revoir.
+
+**Ce qui est ambigu ne se tranche pas dans l'urgence** : l'agent laisse un commentaire
+`ponytail:` à l'endroit concerné, documentant la question et le choix provisoire.
 
 **4. Commit** — après vérification que la suite complète est verte et que `pnpm lint` et
 `pnpm typecheck` passent. Puis règle suivante.
+
+### Boucle de test
+
+**Toute modification de code relance les tests qu'elle touche, immédiatement.** Cela vaut
+pour l'agent « code » comme pour les retouches issues de la relecture ponytail.
+
+L'outil pour cela est `vitest related`, qui exécute les seuls tests important le fichier
+modifié :
+
+```bash
+pnpm test:related src/analysis/climbs.ts
+```
+
+Le mode watch de Vitest n'est pas le bon outil ici : il est conçu pour un humain qui
+surveille un terminal, alors qu'un agent a besoin d'un code de sortie et d'une sortie
+délimitée. Il reste utile en parallèle, pour toi, pendant que les agents travaillent —
+lancer `pnpm test --watch` dans un terminal à part ne gêne rien. Mais ce qui fait foi, c'est
+l'exécution explicite et son résultat rapporté.
+
+La suite complète, elle, ne tourne qu'une fois par cycle : juste avant le commit. Elle
+attrape les régressions à distance que `related` ne voit pas.
 
 ### Conventions
 
@@ -136,7 +162,9 @@ pnpm add -D vite typescript @biomejs/biome vitest lefthook knip
 
 - [ ] **Step 7 : Déclarer les scripts**
 
-`dev`, `build`, `preview`, `lint` (`biome check`), `format` (`biome format --write`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`), `knip`.
+`dev`, `build`, `preview`, `lint` (`biome check`), `format` (`biome format --write`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`), `test:related` (`vitest related --run`), `knip`.
+
+`test:related` est la commande de la boucle de test décrite plus haut : elle n'exécute que les tests important les fichiers qu'on lui passe.
 
 - [ ] **Step 8 : Vérifier le socle**
 
