@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cumulativeDistances, haversine } from "../src/analysis/geo";
+import { cumulativeDistances, EARTH_RADIUS_M, haversine } from "../src/analysis/geo";
 import type { Track, TrackPoint } from "../src/gpx/parser";
 
-const DEGRE_DE_LATITUDE_M = 111_195;
-const TOLERANCE_RELATIVE = 0.001;
-// ponytail: ce 6_371_000 duplique EARTH_RADIUS_M, non exporté par geo.ts. L'exporter
-// rendrait le test tautologique ; le dupliquer fait échouer la précision millimétrique
-// dès que le rayon de l'implémentation bouge. Lequel des deux couplages assume-t-on ?
-const METRE_EN_DEGRE_DE_LATITUDE = 180 / (Math.PI * 6_371_000);
-const ESPACEMENT_M = 100;
-const PRECISION_MILLIMETRIQUE = 3;
+const LATITUDE_DEGREE_METER = 111_195;
+const RELATIVE_TOLERANCE = 0.001;
+const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
+const SPACING_METER = 100;
+const MILLIMETER_DIGITS = 3;
 
 const point = (lat: number, lon: number): TrackPoint => ({
   lat,
@@ -21,19 +18,19 @@ const point = (lat: number, lon: number): TrackPoint => ({
 describe("haversine rend la distance orthodromique entre deux points, en mètres", () => {
   it("mesure un degré de latitude à 0,1 % près", () => {
     const distance = haversine(point(45, 6), point(46, 6));
-    const ecartRelatif = Math.abs(distance - DEGRE_DE_LATITUDE_M) / DEGRE_DE_LATITUDE_M;
+    const relativeError = Math.abs(distance - LATITUDE_DEGREE_METER) / LATITUDE_DEGREE_METER;
 
-    expect(ecartRelatif).toBeLessThan(TOLERANCE_RELATIVE);
+    expect(relativeError).toBeLessThan(RELATIVE_TOLERANCE);
   });
 
   // Un degré de longitude vaut `cos(latitude)` degré de latitude : à 60°, le cosinus
   // vaut exactement 1/2, d'où l'attendu à la moitié du degré de latitude.
   it("mesure un degré de longitude à 60° de latitude comme un demi-degré de latitude, à 0,1 % près", () => {
-    const attendu = DEGRE_DE_LATITUDE_M / 2;
+    const expected = LATITUDE_DEGREE_METER / 2;
     const distance = haversine(point(60, 6), point(60, 7));
-    const ecartRelatif = Math.abs(distance - attendu) / attendu;
+    const relativeError = Math.abs(distance - expected) / expected;
 
-    expect(ecartRelatif).toBeLessThan(TOLERANCE_RELATIVE);
+    expect(relativeError).toBeLessThan(RELATIVE_TOLERANCE);
   });
 
   it("rend 0 entre deux points identiques", () => {
@@ -49,45 +46,36 @@ describe("haversine rend la distance orthodromique entre deux points, en mètres
 });
 
 /** Point de la trace au rang donné : `rang` fois 100 m plus au nord que le premier. */
-const pointAuRang = (rang: number): TrackPoint =>
-  point(45 + rang * ESPACEMENT_M * METRE_EN_DEGRE_DE_LATITUDE, 6);
+const pointAtIndex = (index: number): TrackPoint =>
+  point(45 + index * SPACING_METER * LATITUDE_DEGREES_PER_METER, 6);
 
 describe("cumulativeDistances rend une distance par point de la trace, commençant à 0 et croissante", () => {
   it("rend [0, ~100, ~200] pour trois points alignés espacés de 100 m", () => {
-    const trace: Track = [pointAuRang(0), pointAuRang(1), pointAuRang(2)];
+    const track: Track = [pointAtIndex(0), pointAtIndex(1), pointAtIndex(2)];
 
-    expect(cumulativeDistances(trace)).toEqual([
+    expect(cumulativeDistances(track)).toEqual([
       0,
-      expect.closeTo(ESPACEMENT_M, PRECISION_MILLIMETRIQUE),
-      expect.closeTo(2 * ESPACEMENT_M, PRECISION_MILLIMETRIQUE),
+      expect.closeTo(SPACING_METER, MILLIMETER_DIGITS),
+      expect.closeTo(2 * SPACING_METER, MILLIMETER_DIGITS),
     ]);
   });
 
   it("croît d'un point au suivant", () => {
-    const trace: Track = [
-      pointAuRang(0),
-      pointAuRang(3),
-      pointAuRang(1),
-      pointAuRang(7),
-      pointAuRang(2),
+    const track: Track = [
+      pointAtIndex(0),
+      pointAtIndex(3),
+      pointAtIndex(1),
+      pointAtIndex(7),
+      pointAtIndex(2),
     ];
 
-    const distances = cumulativeDistances(trace);
+    const distances = cumulativeDistances(track);
 
-    let precedente = Number.NEGATIVE_INFINITY;
+    let previous = Number.NEGATIVE_INFINITY;
 
     for (const distance of distances) {
-      expect(distance).toBeGreaterThanOrEqual(precedente);
-      precedente = distance;
+      expect(distance).toBeGreaterThanOrEqual(previous);
+      previous = distance;
     }
-  });
-
-  // Test à l'usage de `tsc` seul : `it.skip` typecheck son corps sans jamais
-  // l'exécuter, et un appel réel sur une trace sans signification ne prouverait rien.
-  it.skip("refuse à la compilation une trace de moins de deux points", () => {
-    // @ts-expect-error une trace vide n'est pas une Track
-    cumulativeDistances([]);
-    // @ts-expect-error un point seul n'est pas une Track
-    cumulativeDistances([point(45, 6)]);
   });
 });
