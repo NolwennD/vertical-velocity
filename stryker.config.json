@@ -4,6 +4,7 @@
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
   "coverageAnalysis": "perTest",
+  "cleanTempDir": "always",
   "mutate": ["src/analysis/**/*.ts", "src/gpx/**/*.ts"],
   "reporters": ["progress", "clear-text", "html"],
   "htmlReporter": { "fileName": "reports/mutation.html" }

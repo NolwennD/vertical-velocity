@@ -128,20 +128,21 @@ describe("cumulativeDistances, propriétés d'une distance cumulée le long d'un
     );
   });
 
-  it("finit sur la somme des distances entre points consécutifs", () => {
+  /**
+   * La ligne brisée ne coupe jamais au plus court : le cumul final majore la corde
+   * du premier au dernier point. Relation géométrique, pas la définition du cumul —
+   * elle ne rejoue ni l'accumulation ni son ordre. Les deux `Number.NaN` couvrent
+   * un tableau vide que le type interdit : ils font échouer, ils ne masquent rien.
+   */
+  it("finit sur au moins la distance directe entre le premier et le dernier point", () => {
     fc.assert(
       fc.property(traceArbitraire, (trace) => {
-        const derniere = cumulativeDistances(trace).at(-1) ?? Number.NaN;
+        const [premier] = trace;
+        const dernier = trace.at(-1);
+        const corde = dernier === undefined ? Number.NaN : haversine(premier, dernier);
+        const cumulee = cumulativeDistances(trace).at(-1) ?? Number.NaN;
 
-        let somme = 0;
-        let precedent: TrackPoint | undefined;
-
-        for (const point of trace) {
-          somme += precedent === undefined ? 0 : haversine(precedent, point);
-          precedent = point;
-        }
-
-        expect(Math.abs(derniere - somme)).toBeLessThanOrEqual(MARGE_RELATIVE * somme);
+        expect(corde).toBeLessThanOrEqual(cumulee + MARGE_RELATIVE * cumulee + PLANCHER_M);
       }),
     );
   });

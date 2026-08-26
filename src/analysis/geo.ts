@@ -28,10 +28,13 @@ export function haversine(a: TrackPoint, b: TrackPoint): number {
 export function cumulativeDistances(points: Track): number[] {
   const distances: number[] = [];
   let total = 0;
-  let previous: TrackPoint | undefined;
+  // Une `Track` a toujours un premier point : le prendre pour prédécesseur initial
+  // ôte le cas absurde du `undefined`, et le premier tour ajoute `haversine(p, p)`,
+  // c'est-à-dire 0 exactement.
+  let previous = points[0];
 
   for (const point of points) {
-    total += previous === undefined ? 0 : haversine(previous, point);
+    total += haversine(previous, point);
     distances.push(total);
     previous = point;
   }
