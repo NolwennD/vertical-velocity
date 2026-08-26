@@ -2,7 +2,7 @@ import { gpx } from "@tmcw/togeojson";
 import { GpxError, type Track, type TrackPoint } from "./parser";
 
 type XmlDocument = Parameters<typeof gpx>[0];
-export type XmlParser = (xml: string) => XmlDocument;
+type XmlParser = (xml: string) => XmlDocument;
 
 const browserXmlParser: XmlParser = (xml) =>
   new DOMParser().parseFromString(xml, "application/xml");
@@ -20,13 +20,10 @@ const lines = (feature: ReturnType<typeof gpx>["features"][number]): Line[] => {
   const geometry = feature.geometry;
   const times = feature.properties?.coordinateProperties?.times;
 
-  if (geometry === null) {
-    return [];
-  }
-  if (geometry.type === "LineString") {
+  if (geometry?.type === "LineString") {
     return [{ positions: geometry.coordinates, times }];
   }
-  if (geometry.type === "MultiLineString") {
+  if (geometry?.type === "MultiLineString") {
     return geometry.coordinates.map((positions, index) => ({
       positions,
       times: at(times, index),
@@ -52,8 +49,6 @@ const toTrackPoint = ({ position, time }: RawPoint): TrackPoint | undefined => {
   return { lat, lon, ele, time: Temporal.Instant.from(time) };
 };
 
-const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
-
 export const parseGpx = (xml: string, parseXml: XmlParser = browserXmlParser): Track => {
   const document = parse(xml, parseXml);
   const raw = rawPoints(gpx(document));
@@ -68,7 +63,7 @@ export const parseGpx = (xml: string, parseXml: XmlParser = browserXmlParser): T
     throw new GpxError("no-time");
   }
 
-  const points = raw.map(toTrackPoint).filter(isDefined);
+  const points = raw.map(toTrackPoint).filter((point) => point !== undefined);
   const [first, second, ...rest] = points;
   if (first === undefined || second === undefined) {
     throw new GpxError("no-track-points");
@@ -78,17 +73,13 @@ export const parseGpx = (xml: string, parseXml: XmlParser = browserXmlParser): T
 };
 
 const parse = (xml: string, parseXml: XmlParser): XmlDocument => {
-  const document = ((): XmlDocument => {
-    try {
-      return parseXml(xml);
-    } catch {
+  try {
+    const document = parseXml(xml);
+    if (isRejected(document)) {
       throw new GpxError("invalid-xml");
     }
-  })();
-
-  if (isRejected(document)) {
+    return document;
+  } catch {
     throw new GpxError("invalid-xml");
   }
-
-  return document;
 };

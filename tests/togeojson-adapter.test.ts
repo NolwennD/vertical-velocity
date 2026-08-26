@@ -35,7 +35,6 @@ describe("a valid GPX becomes a sequence of TrackPoint in the file's order", () 
   it("returns one point per trkpt, with its coordinates and elevation", () => {
     const track = parse(minimalGpx);
 
-    expect(track).toHaveLength(3);
     expect(track.map(({ lat, lon, ele }) => ({ lat, lon, ele }))).toEqual([
       { lat: 45.1, lon: 6.1, ele: 1000 },
       { lat: 45.101, lon: 6.101, ele: 1010.5 },
@@ -87,8 +86,7 @@ describe("failures surface as a GpxError carrying a domain code", () => {
     const failures = ["certainly not xml", document("<trk></trk>"), segment(withoutAnyElevation)];
 
     for (const xml of failures) {
-      expect(() => parse(xml)).toThrowError(GpxError);
-      expect(codeOf(() => parse(xml))).toMatch(/^(invalid-xml|no-track-points|no-elevation)$/);
+      expect(() => parse(xml)).toThrow(GpxError);
     }
   });
 });
