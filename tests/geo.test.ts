@@ -26,6 +26,16 @@ describe("haversine rend la distance orthodromique entre deux points, en mètres
     expect(ecartRelatif).toBeLessThan(TOLERANCE_RELATIVE);
   });
 
+  // Un degré de longitude vaut `cos(latitude)` degré de latitude : à 60°, le cosinus
+  // vaut exactement 1/2, d'où l'attendu à la moitié du degré de latitude.
+  it("mesure un degré de longitude à 60° de latitude comme un demi-degré de latitude, à 0,1 % près", () => {
+    const attendu = DEGRE_DE_LATITUDE_M / 2;
+    const distance = haversine(point(60, 6), point(60, 7));
+    const ecartRelatif = Math.abs(distance - attendu) / attendu;
+
+    expect(ecartRelatif).toBeLessThan(TOLERANCE_RELATIVE);
+  });
+
   it("rend 0 entre deux points identiques", () => {
     expect(haversine(point(45, 6), point(45, 6))).toBe(0);
   });
