@@ -238,7 +238,9 @@ git add -A && git commit -m "Déclare les seuils par défaut et le contrat de pa
 **Tests — intention**
 
 > **Règle : `haversine` rend la distance orthodromique en mètres.**
-> - deux points séparés d'un degré de latitude → ≈ 111 320 m, à 0,1 % près
+> - deux points séparés d'un degré de latitude → ≈ 111 195 m, à 0,1 % près
+>   (soit `6 371 000 × π/180` ; ne pas confondre avec les 111 320 m d'un degré de
+>   longitude à l'équateur, qui se calculent sur le rayon équatorial)
 > - deux points identiques → 0
 > - l'ordre des arguments ne change pas le résultat
 
