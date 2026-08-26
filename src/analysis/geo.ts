@@ -20,3 +20,21 @@ export function haversine(a: TrackPoint, b: TrackPoint): number {
 
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
+
+/**
+ * Distance parcourue depuis le premier point, en mètres, pour chaque point de
+ * la trace. Même longueur que l'entrée, commence à 0, croissante.
+ */
+export function cumulativeDistances(points: readonly TrackPoint[]): number[] {
+  const distances: number[] = [];
+  let total = 0;
+  let previous: TrackPoint | undefined;
+
+  for (const point of points) {
+    total += previous === undefined ? 0 : haversine(previous, point);
+    distances.push(total);
+    previous = point;
+  }
+
+  return distances;
+}
