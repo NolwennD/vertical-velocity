@@ -1,0 +1,9 @@
+# Formatage uniquement. Le lint bloquant, le typecheck et les tests
+# tournent à la main pendant le développement et en CI, pas ici :
+# un commit doit rester instantané.
+pre-commit:
+  jobs:
+    - name: format
+      glob: "*.{ts,js,json,jsonc,css,html}"
+      run: pnpm exec biome format --write {staged_files}
+      stage_fixed: true

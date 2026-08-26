@@ -104,7 +104,7 @@ L'extraction des montées, elle, n'emploie aucune dépendance, faute d'équivale
 librairie JS ne fait de détection de segments montants. C'est de toute façon le cœur de
 l'application, dont la valeur tient entièrement aux seuils retenus.
 
-**Gestionnaire de paquets : pnpm** (11.5.1 sur la machine de développement, Node 24.10.0).
+**Gestionnaire de paquets : pnpm** (11.24.0 sur la machine de développement, Node 24.10.0).
 Le champ `packageManager` du `package.json` fige la version, et `pnpm-lock.yaml` est
 versionné. Les deux CI installent avec `--frozen-lockfile`, ce qui fait échouer le build si
 le verrou et le `package.json` divergent, plutôt que de résoudre silencieusement des

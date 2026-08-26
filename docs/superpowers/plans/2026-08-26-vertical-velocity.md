@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Gestionnaire de paquets : **pnpm** 11.5.1, figé par le champ `packageManager`. Node 24.10.0.
+- Gestionnaire de paquets : **pnpm** 11.24.0, figé par le champ `packageManager`. Node 24.10.0.
 - Dépendances d'exécution limitées à **`chart.js`**, **`chartjs-plugin-annotation`**, **`@tmcw/togeojson`**. Aucune autre sans décision explicite.
 - TypeScript en mode **`strict`** avec **`noUncheckedIndexedAccess`**.
 - Le vocabulaire du code n'emploie jamais l'acronyme « VAM » : forme développée `verticalVelocity` / `vertical-velocity`.
@@ -132,7 +132,7 @@ attrape les régressions à distance que `related` ne voit pas.
 
 - [ ] **Step 1 : Initialiser le projet**
 
-`pnpm init`, puis renseigner `"packageManager": "pnpm@11.5.1"` et `"type": "module"`.
+`pnpm init`, puis renseigner `"packageManager": "pnpm@11.24.0"` et `"type": "module"`.
 
 - [ ] **Step 2 : Installer les dépendances**
 
