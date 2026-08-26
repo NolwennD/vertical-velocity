@@ -782,9 +782,15 @@ git add -A && git commit -m "Ajoute le tableau des montées et la synchronisatio
 
 - [ ] **Step 1 : Installer et configurer Playwright**
 
+**Déjà fait** : `@playwright/test` 1.62.1 est installé et le navigateur téléchargé.
+
 ```bash
-pnpm add -D @playwright/test && pnpm exec playwright install --with-deps chromium
+pnpm exec playwright install chromium
 ```
+
+Sans `--with-deps` en local : la machine de développement fait déjà tourner un chromium et un firefox, donc les bibliothèques système sont présentes. Vérifié — le navigateur se lance et `canvas.getContext('2d')` répond, ce dont dépend Chart.js. En CI en revanche, `--with-deps` reste nécessaire : les conteneurs de runner sont nus.
+
+Les navigateurs du système ne sont pas réutilisés directement : le chromium local est un paquet snap, confiné, incapable d'accéder aux profils temporaires que Playwright crée hors de sa cage.
 
 `playwright.config.ts` avec un `webServer` lançant `pnpm dev`.
 
