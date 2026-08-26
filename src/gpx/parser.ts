@@ -11,6 +11,17 @@ export type TrackPoint = {
   time: Date;
 };
 
+/**
+ * Une trace exploitable : au moins deux points. Le type interdit d'exprimer les
+ * cas qui n'ont pas de sens — trace vide, trace d'un seul point — pour qu'aucune
+ * fonction d'analyse n'ait à les traiter. La garantie est établie une seule fois,
+ * par le parsing, et se propage ensuite à tout le pipeline.
+ *
+ * Reste un tableau : `map`, `for...of` et `.length` fonctionnent, et une `Track`
+ * se passe à toute fonction attendant `readonly TrackPoint[]`.
+ */
+export type Track = readonly [TrackPoint, TrackPoint, ...TrackPoint[]];
+
 export type GpxErrorCode = "invalid-xml" | "no-track-points" | "no-elevation" | "no-time";
 
 /**
@@ -25,4 +36,4 @@ export class GpxError extends Error {
   }
 }
 
-export type GpxParser = (xml: string) => TrackPoint[];
+export type GpxParser = (xml: string) => Track;

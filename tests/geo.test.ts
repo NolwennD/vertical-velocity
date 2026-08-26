@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cumulativeDistances, haversine } from "../src/analysis/geo";
-import type { TrackPoint } from "../src/gpx/parser";
+import type { Track, TrackPoint } from "../src/gpx/parser";
 
 const DEGRE_DE_LATITUDE_M = 111_195;
 const TOLERANCE_RELATIVE = 0.001;
@@ -38,11 +38,13 @@ describe("haversine rend la distance orthodromique entre deux points, en mètres
   });
 });
 
-describe("cumulativeDistances rend un tableau de même longueur que l'entrée, croissant, commençant à 0", () => {
+/** Point de la trace au rang donné : `rang` fois 100 m plus au nord que le premier. */
+const pointAuRang = (rang: number): TrackPoint =>
+  point(45 + rang * ESPACEMENT_M * METRE_EN_DEGRE_DE_LATITUDE, 6);
+
+describe("cumulativeDistances rend une distance par point de la trace, commençant à 0 et croissante", () => {
   it("rend [0, ~100, ~200] pour trois points alignés espacés de 100 m", () => {
-    const trace = [0, 1, 2].map((rang) =>
-      point(45 + rang * ESPACEMENT_M * METRE_EN_DEGRE_DE_LATITUDE, 6),
-    );
+    const trace: Track = [pointAuRang(0), pointAuRang(1), pointAuRang(2)];
 
     expect(cumulativeDistances(trace)).toEqual([
       0,
@@ -52,9 +54,13 @@ describe("cumulativeDistances rend un tableau de même longueur que l'entrée, c
   });
 
   it("croît d'un point au suivant", () => {
-    const trace = [0, 3, 1, 7, 2].map((rang) =>
-      point(45 + rang * ESPACEMENT_M * METRE_EN_DEGRE_DE_LATITUDE, 6),
-    );
+    const trace: Track = [
+      pointAuRang(0),
+      pointAuRang(3),
+      pointAuRang(1),
+      pointAuRang(7),
+      pointAuRang(2),
+    ];
 
     const distances = cumulativeDistances(trace);
 
@@ -66,11 +72,12 @@ describe("cumulativeDistances rend un tableau de même longueur que l'entrée, c
     }
   });
 
-  it("rend [0] pour un seul point", () => {
-    expect(cumulativeDistances([point(45, 6)])).toEqual([0]);
-  });
-
-  it("rend [] pour un tableau vide", () => {
-    expect(cumulativeDistances([])).toEqual([]);
+  // Test à l'usage de `tsc` seul : `it.skip` typecheck son corps sans jamais
+  // l'exécuter, et un appel réel sur une trace sans signification ne prouverait rien.
+  it.skip("refuse à la compilation une trace de moins de deux points", () => {
+    // @ts-expect-error une trace vide n'est pas une Track
+    cumulativeDistances([]);
+    // @ts-expect-error un point seul n'est pas une Track
+    cumulativeDistances([point(45, 6)]);
   });
 });

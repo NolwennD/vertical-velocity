@@ -1,4 +1,4 @@
-import type { TrackPoint } from "../gpx/parser";
+import type { Track, TrackPoint } from "../gpx/parser";
 
 /** Rayon moyen de la Terre, en mètres. */
 const EARTH_RADIUS_M = 6_371_000;
@@ -25,7 +25,7 @@ export function haversine(a: TrackPoint, b: TrackPoint): number {
  * Distance parcourue depuis le premier point, en mètres, pour chaque point de
  * la trace. Même longueur que l'entrée, commence à 0, croissante.
  */
-export function cumulativeDistances(points: readonly TrackPoint[]): number[] {
+export function cumulativeDistances(points: Track): number[] {
   const distances: number[] = [];
   let total = 0;
   let previous: TrackPoint | undefined;

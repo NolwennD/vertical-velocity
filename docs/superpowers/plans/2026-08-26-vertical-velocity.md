@@ -30,7 +30,7 @@
 | Fichier | Responsabilité |
 |---|---|
 | `src/constants.ts` | Type `Thresholds` et objet `DEFAULTS` — les neuf seuils commentés |
-| `src/gpx/parser.ts` | Contrat : `TrackPoint`, `GpxParser`, `GpxError` et ses codes |
+| `src/gpx/parser.ts` | Contrat : `TrackPoint`, `Track` (≥ 2 points), `GpxParser`, `GpxError` |
 | `src/gpx/togeojson-adapter.ts` | Implémentation du contrat via `@tmcw/togeojson` |
 | `src/analysis/geo.ts` | Haversine, distances cumulées |
 | `src/analysis/smooth.ts` | Médiane 5 points puis moyenne glissante 30 m |
@@ -226,7 +226,8 @@ git add -A && git commit -m "Met en place le socle Vite, TypeScript, Biome et le
   export type TrackPoint = { lat: number; lon: number; ele: number; time: Date };
   export type GpxErrorCode = 'invalid-xml' | 'no-track-points' | 'no-elevation' | 'no-time';
   export class GpxError extends Error { readonly code: GpxErrorCode }
-  export type GpxParser = (xml: string) => TrackPoint[];
+  export type Track = readonly [TrackPoint, TrackPoint, ...TrackPoint[]];
+  export type GpxParser = (xml: string) => Track;
   ```
 
 - [ ] **Step 1 : Écrire les deux fichiers**
@@ -255,7 +256,7 @@ git add -A && git commit -m "Déclare les seuils par défaut et le contrat de pa
 - Produces:
   ```ts
   export function haversine(a: TrackPoint, b: TrackPoint): number;          // mètres
-  export function cumulativeDistances(points: readonly TrackPoint[]): number[];
+  export function cumulativeDistances(points: Track): number[];
   ```
 
 **Tests — intention**
@@ -300,7 +301,7 @@ git add -A && git commit -m "Ajoute le calcul des distances haversine"
 
 **Interfaces:**
 - Consumes: `TrackPoint`, `GpxParser`, `GpxError`, `GpxErrorCode`
-- Produces: `export const parseGpx: GpxParser;`
+- Produces: `export const parseGpx: GpxParser;   // rend une Track : au moins deux points`
 
 **Tests — intention**
 
@@ -367,7 +368,7 @@ git add -A && git commit -m "Ajoute l'adaptateur de parsing GPX et les fixtures 
 - Produces:
   ```ts
   export function smoothElevations(
-    points: readonly TrackPoint[],
+    points: Track,
     cumulative: readonly number[],
     t?: Thresholds,
   ): number[];
@@ -418,10 +419,10 @@ git add -A && git commit -m "Ajoute le lissage de l'altitude"
 - Consumes: `TrackPoint`, `Thresholds`, `DEFAULTS`, `haversine`
 - Produces:
   ```ts
-  export function findStops(points: readonly TrackPoint[], t?: Thresholds): boolean[];
+  export function findStops(points: Track, t?: Thresholds): boolean[];
   export type TimeBreakdown = { movingS: number; stoppedS: number; gapS: number };
   export function timeBreakdown(
-    points: readonly TrackPoint[],
+    points: Track,
     stopped: readonly boolean[],
     fromIdx: number,
     toIdx: number,
@@ -556,12 +557,12 @@ git add -A && git commit -m "Ajoute le découpage des parties montantes"
     verticalVelocityElapsed: number;   // m/h
   };
   export type Analysis = {
-    points: readonly TrackPoint[];
+    points: Track;
     cumulative: readonly number[];
     smoothed: readonly number[];
     climbs: readonly Climb[];
   };
-  export function analyse(points: readonly TrackPoint[], t?: Thresholds): Analysis;
+  export function analyse(points: Track, t?: Thresholds): Analysis;
   ```
 
 **Tests — intention**

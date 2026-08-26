@@ -96,7 +96,7 @@ finirait par rencontrer.
 Elle convertit vers GeoJSON, une forme qui n'est pas la nôtre : les horodatages atterrissent
 dans `properties.coordinateProperties.times`, séparés de la géométrie. **Un adaptateur
 absorbe cet écart** — `gpx/togeojson-adapter.ts` implémente le contrat déclaré par
-`gpx/parser.ts`, qui ne connaît que `TrackPoint[]` et les erreurs du domaine. Aucun autre
+`gpx/parser.ts`, qui ne connaît que `Track` et les erreurs du domaine. Aucun autre
 module ne voit passer de GeoJSON. Changer de librairie, ou revenir à `DOMParser`, revient
 alors à écrire un second adaptateur.
 
@@ -117,7 +117,7 @@ jamais au DOM, donc testable sans navigateur.
 src/
   constants.ts                 DEFAULTS : les seuils de l'algorithme, commentés
   gpx/
-    parser.ts                  contrat : GpxParser, TrackPoint[], erreurs du domaine
+    parser.ts                  contrat : GpxParser, TrackPoint, Track, erreurs
     togeojson-adapter.ts       implémentation du contrat via @tmcw/togeojson
   analysis/
     geo.ts                     haversine, distances cumulées
@@ -175,9 +175,16 @@ type TrackPoint = {
   time: Date;
 };
 
+// Une trace exploitable : au moins deux points. Le type interdit d'exprimer les
+// cas qui n'ont pas de sens, pour qu'aucune fonction d'analyse n'ait à les
+// traiter. La garantie est établie une seule fois, par le parsing, et se propage
+// ensuite à tout le pipeline. Reste un tableau, donc utilisable partout où l'on
+// attend `readonly TrackPoint[]`.
+type Track = readonly [TrackPoint, TrackPoint, ...TrackPoint[]];
+
 // Le contrat que tout adaptateur de parsing doit remplir. Il ne mentionne ni
 // GeoJSON ni XML : le reste de l'application ignore d'où viennent les points.
-type GpxParser = (xml: string) => TrackPoint[];
+type GpxParser = (xml: string) => Track;
 
 type Climb = {
   startIdx: number;
@@ -304,7 +311,7 @@ Chaque cas affiche un message explicite à la place du graphe.
 | Cas | Comportement |
 |---|---|
 | Le fichier n'est pas du XML, ou pas un GPX | Message « fichier GPX invalide » |
-| Aucun `<trkpt>` | Message « aucun point de trace » — cas des GPX ne contenant qu'un `<rte>` |
+| Moins de deux `<trkpt>` exploitables | Message « aucun point de trace » — cas des GPX ne contenant qu'un `<rte>`, ou d'une trace d'un seul point, dont on ne peut tirer ni distance, ni durée, ni montée |
 | Aucun `<ele>` | Message « altitude absente » — fréquent sur les traces de planificateurs |
 | Aucun `<time>` | Message « horodatage absent ». Sans temps, aucune vitesse n'est calculable : on ne montre rien plutôt qu'un profil qui laisserait croire à une analyse |
 | Aucune montée au-dessus des seuils | Le profil est affiché, avec une note indiquant qu'aucune montée d'au moins 20 m n'a été trouvée |
