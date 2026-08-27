@@ -1,3 +1,34 @@
 :root {
   font-family: system-ui, sans-serif;
 }
+
+body {
+  margin: 0 auto;
+  max-width: 60rem;
+  padding: 1rem;
+}
+
+header {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dropzone {
+  background: none;
+  border: 2px dashed currentcolor;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  padding: 2rem;
+  width: 100%;
+}
+
+.dropzone.over {
+  border-style: solid;
+}
+
+.dropzone.loaded {
+  border-style: solid;
+  padding: 0.5rem;
+}

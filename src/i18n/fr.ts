@@ -1,0 +1,25 @@
+import type { MessageKey } from "./en";
+
+export const fr: Record<MessageKey, string> = {
+  "app-title": "Vitesse ascensionnelle",
+  "drop-zone": "Déposez un fichier GPX ici, ou cliquez pour en choisir un",
+  language: "Langue",
+  "chart-distance": "Distance (km)",
+  "chart-elevation": "Altitude (m)",
+  "table-number": "N°",
+  "table-start-elevation": "Départ",
+  "table-end-elevation": "Arrivée",
+  "table-gain": "Dénivelé",
+  "table-distance": "Distance",
+  "table-average-grade": "Pente moyenne",
+  "table-moving-time": "Temps de mouvement",
+  "table-elapsed-time": "Temps total",
+  "table-vertical-velocity-moving": "Vitesse ascensionnelle en mouvement",
+  "table-vertical-velocity-elapsed": "Vitesse ascensionnelle totale",
+  "table-total": "Total",
+  "invalid-xml": "Ce fichier n'est pas un GPX valide.",
+  "no-track-points": "Ce fichier ne contient aucun point de trace exploitable.",
+  "no-elevation": "Cette trace ne porte aucune altitude.",
+  "no-time": "Cette trace ne porte aucun horodatage, aucune vitesse n'est calculable.",
+  "no-climbs": "Aucune montée d'au moins 20 m n'a été trouvée.",
+};

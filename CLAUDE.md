@@ -12,6 +12,7 @@ Everything runs in the browser. No track data ever leaves over the network.
 
 ```bash
 pnpm check          # THE verification command: tsc → biome → vitest → stryker
+pnpm check:ui       # the interface: tsc → biome → playwright
 ```
 
 `check` runs the four checks **in this order**, from fastest and most informative to
@@ -19,12 +20,21 @@ slowest, and stops at the first failure. The order isn't arbitrary: a type that 
 compile makes the other verdicts worthless, and Stryker reruns the suite hundreds of
 times — running it before you have a stable green is wasted time.
 
+**`check` never writes.** Formatting is deliberately left out of it: `pnpm lint` is
+`biome lint`, which judges the code and ignores its layout. A verification command that
+rewrites the files under it can turn red into green on its own, and you no longer know
+what you verified. `pnpm format` stays available, to be run when you want it.
+
+`check:ui` covers what `check` cannot see: Playwright drives a real browser, which is
+the only way to exercise the `<canvas>` and a real `<input type="file">`.
+
 The same checks run separately, when you're after a specific point:
 
 ```bash
 pnpm typecheck      # tsc --noEmit
-pnpm lint           # biome check
+pnpm lint           # biome lint, the linter alone
 pnpm test           # full suite
+pnpm test:e2e       # playwright, needs no running server: it starts its own
 pnpm test:mutation  # Stryker: measures what the tests actually catch
 pnpm test:related   # only the tests importing the files passed as arguments
 pnpm format         # biome format --write

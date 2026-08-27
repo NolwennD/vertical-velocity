@@ -7,6 +7,6 @@ export default defineConfig({
   test: {
     // Stryker recopie tout le projet dans son bac à sable pour y muter le code.
     // Sans cette exclusion, vitest y retrouve les tests et les compte deux fois.
-    exclude: [...configDefaults.exclude, ".stryker-tmp/**"],
+    exclude: [...configDefaults.exclude, ".stryker-tmp/**", "e2e/**"],
   },
 });
