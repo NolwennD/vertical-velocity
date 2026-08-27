@@ -61,17 +61,17 @@ const arbitraryTrack = fc
 
 const arbitraryFlags = fc.array(fc.boolean(), { minLength: FLAG_COUNT, maxLength: FLAG_COUNT });
 
-describe("a point is immobile when it stays within six meters for at least ten seconds", () => {
+describe("a point is immobile when it stays within six meters for at least twenty seconds", () => {
   it("marks thirty seconds spent at the same position", () => {
     expect(immobilityOf(trackOf(walk(31, { meter: 0, second: 0 }, 0)))).toEqual(repeat(31, true));
   });
 
-  it("marks ten seconds spent at the same position, the shortest immobility there is", () => {
-    expect(immobilityOf(trackOf(walk(11, { meter: 0, second: 0 }, 0)))).toEqual(repeat(11, true));
+  it("marks twenty seconds spent at the same position, the shortest immobility there is", () => {
+    expect(immobilityOf(trackOf(walk(21, { meter: 0, second: 0 }, 0)))).toEqual(repeat(21, true));
   });
 
-  it("leaves six seconds at the same position unmarked, too brief to count", () => {
-    expect(immobilityOf(trackOf(walk(7, { meter: 0, second: 0 }, 0)))).toEqual(repeat(7, false));
+  it("leaves nineteen seconds at the same position unmarked, just short of the threshold", () => {
+    expect(immobilityOf(trackOf(walk(20, { meter: 0, second: 0 }, 0)))).toEqual(repeat(20, false));
   });
 
   it("marks thirty seconds of drift within a four meter radius, as GPS noise does not cancel it", () => {

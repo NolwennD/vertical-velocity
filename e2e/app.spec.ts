@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 
-const REAL_GPX = "tests/fixtures/real-file-anonymised.gpx";
+const CYCLING_GPX = "tests/fixtures/cycling-anonymised.gpx";
 
 const gpx = (points: string): string =>
   `<?xml version="1.0" encoding="UTF-8"?>
@@ -128,9 +128,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("names the file and counts the climbs of the reference recording", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
 
-  await expect(zone(page)).toHaveText("real-file-anonymised.gpx");
+  await expect(zone(page)).toHaveText("cycling-anonymised.gpx");
   await expect(message(page)).toContainText("3");
 });
 
@@ -159,7 +159,7 @@ test("translates the interface when the language changes", async ({ page }) => {
 });
 
 test("counts the climbs in the active language, plural included", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(message(page)).toHaveText("3 climbs");
 
   await page.locator("#language select").selectOption("fr");
@@ -187,7 +187,7 @@ test("remembers the chosen language across a reload", async ({ page }) => {
 test("draws the elevation profile once a track is loaded", async ({ page }) => {
   expect(await paintedPixels(page)).toBe(0);
 
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(message(page)).toContainText("3");
 
   expect(await canvasWidth(page)).toBeGreaterThan(0);
@@ -202,14 +202,14 @@ test("leaves the canvas blank when the track cannot be analysed", async ({ page 
 });
 
 test("marks each detected climb with its own band", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(message(page)).toContainText("3");
 
   expect(await bandSpans(page)).toBe(3);
 });
 
 test("repaints the chart when the language changes", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(message(page)).toContainText("3");
   const inEnglish = await canvasFingerprint(page);
 
@@ -220,7 +220,7 @@ test("repaints the chart when the language changes", async ({ page }) => {
 });
 
 test("holds the chart to a bounded height instead of growing without end", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(message(page)).toContainText("3");
 
   const settled = await canvasHeight(page);
@@ -232,14 +232,14 @@ test("holds the chart to a bounded height instead of growing without end", async
 });
 
 test("lists one row per detected climb, and nothing more", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
 
   await expect(page.locator("#table tbody tr")).toHaveCount(3);
   await expect(page.locator("#table tfoot")).toHaveCount(0);
 });
 
 test("gathers the cumulative figures in a summary of its own", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
 
   await expect(page.locator("#summary dt")).toHaveCount(4);
   await expect(page.locator("#summary dd")).toHaveCount(4);
@@ -248,7 +248,7 @@ test("gathers the cumulative figures in a summary of its own", async ({ page }) 
 });
 
 test("labels the summary in the active language", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#summary")).toContainText("Gain");
 
   await page.locator("#language select").selectOption("fr");
@@ -258,7 +258,7 @@ test("labels the summary in the active language", async ({ page }) => {
 });
 
 test("clears the summary when the track cannot be analysed", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#summary dt")).toHaveCount(4);
 
   await pick(page, "flat.gpx", WITHOUT_ELEVATION);
@@ -267,7 +267,7 @@ test("clears the summary when the track cannot be analysed", async ({ page }) =>
 });
 
 test("heads the table in the active language", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#table thead")).toContainText("Gain");
 
   await page.locator("#language select").selectOption("fr");
@@ -282,7 +282,7 @@ test("shows no table when the track cannot be analysed", async ({ page }) => {
 });
 
 test("deepens the matching band while a table row is hovered", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#table tbody tr")).toHaveCount(3);
   const resting = await bandStrength(page);
 
@@ -293,7 +293,7 @@ test("deepens the matching band while a table row is hovered", async ({ page }) 
 });
 
 test("heads each result section so screen readers can name it", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
 
   await expect(page.locator("main section:visible")).toHaveCount(3);
   await expect(page.locator("main section:visible h2")).toHaveCount(3);
@@ -315,7 +315,7 @@ test("drops every result section when the track cannot be analysed", async ({ pa
 });
 
 test("heads the sections in the active language", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#climbs h2")).toHaveText("Climbs");
 
   await page.locator("#language select").selectOption("fr");
@@ -324,7 +324,7 @@ test("heads the sections in the active language", async ({ page }) => {
 });
 
 test("keeps every total joined to the label it belongs to", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
 
   const pairs = page.locator("#summary > div");
   await expect(pairs).toHaveCount(4);
@@ -336,7 +336,7 @@ test("keeps every total joined to the label it belongs to", async ({ page }) => 
 });
 
 test("opens the climb's figures on its band while the row is hovered", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#table tbody tr")).toHaveCount(3);
   const resting = await labelInk(page);
 
@@ -349,7 +349,7 @@ test("opens the climb's figures on its band while the row is hovered", async ({ 
 const velocityCell = (page: Page) => page.locator("#table tbody tr").last().locator("td").nth(7);
 
 test("re-reads the ride when the immobility radius changes", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await expect(page.locator("#table tbody tr")).toHaveCount(3);
   const strict = await velocityCell(page).textContent();
 
@@ -367,7 +367,7 @@ test("labels the immobility control in the active language", async ({ page }) =>
 });
 
 test("keeps the chosen radius across a language change", async ({ page }) => {
-  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await pick(page, "cycling-anonymised.gpx", readFileSync(CYCLING_GPX));
   await page.locator("#immobility select").selectOption("12");
 
   await page.locator("#language select").selectOption("fr");

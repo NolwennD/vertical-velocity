@@ -13,7 +13,9 @@ export type Thresholds = {
    *  Proche de la précision d'un GPS à ciel ouvert. */
   stopRadiusM: number;
   /** Durée minimale d'immobilité constituant un arrêt, en secondes.
-   *  Avec stopRadiusM, définit une vitesse implicite de 2,2 km/h. */
+   *  Avec stopRadiusM, définit une vitesse implicite de 1,1 km/h : en deçà,
+   *  on est réputé immobile. Vingt secondes et non dix, car un marcheur en forte
+   *  pente franchit six mètres en vingt secondes mais pas toujours en dix. */
   stopMinDurationS: number;
   /** Au-delà de cet écart entre deux points, l'intervalle est une coupure
    *  d'enregistrement : ni mouvement, ni arrêt. En secondes. */
@@ -32,7 +34,7 @@ export const DEFAULTS: Thresholds = {
   medianWindowPoints: 5,
   smoothingWindowM: 30,
   stopRadiusM: 6,
-  stopMinDurationS: 10,
+  stopMinDurationS: 20,
   recordingGapS: 60,
   mergeMaxDropM: 10,
   mergeMaxDistanceM: 200,

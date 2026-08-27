@@ -2,8 +2,8 @@ import { DOMParser } from "@xmldom/xmldom";
 import { describe, expect, it } from "vitest";
 import { GpxError } from "../src/gpx/parser";
 import { parseGpx } from "../src/gpx/togeojson-adapter";
+import cyclingGpx from "./fixtures/cycling-anonymised.gpx?raw";
 import minimalGpx from "./fixtures/minimal.gpx?raw";
-import realGpx from "./fixtures/real-file-anonymised.gpx?raw";
 
 const parse = (xml: string) =>
   parseGpx(xml, (source) => new DOMParser().parseFromString(source, "text/xml"));
@@ -61,7 +61,7 @@ describe("a valid GPX becomes a sequence of TrackPoint in the file's order", () 
   });
 
   it("reads the whole real recording", () => {
-    expect(parse(realGpx)).toHaveLength(3422);
+    expect(parse(cyclingGpx)).toHaveLength(3422);
   });
 });
 
