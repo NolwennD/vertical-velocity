@@ -9,7 +9,9 @@ import {
 } from "chart.js";
 import annotationPlugin from "chartjs-plugin-annotation";
 import { type Analysis, analyseClimbs } from "../analysis/vertical-velocity";
+import type { Thresholds } from "../constants";
 import type { I18n } from "../i18n/index";
+import { figuresOf } from "./figures";
 
 Chart.register(
   LineController,
@@ -38,14 +40,24 @@ export function renderChart(
   canvas: HTMLCanvasElement,
   analysis: Analysis,
   i18n: I18n,
+  t: Thresholds,
   onHoverClimb: (climbIndex: number | null) => void,
 ): ChartHandle {
-  const stats = analyseClimbs(analysis.climbs);
+  const stats = analyseClimbs(analysis.climbs, t);
+
+  const detail = (index: number): string[] => {
+    const measured = stats[index];
+
+    return measured === undefined
+      ? [numbered(index)]
+      : [
+          numbered(index),
+          ...figuresOf(measured, i18n).map(([key, value]) => `${i18n.t(key)} ${value}`),
+        ];
+  };
 
   const annotations = Object.fromEntries(
     analysis.climbs.map((climb, index) => {
-      const velocity = stats[index]?.verticalVelocityMoving ?? 0;
-
       return [
         `climb-${index}`,
         {
@@ -56,7 +68,7 @@ export function renderChart(
           borderWidth: 0,
           label: {
             display: true,
-            content: `${numbered(index)} ${i18n.formatNumber(velocity)} m/h`,
+            content: numbered(index),
             position: { x: "center" as const, y: "start" as const },
           },
           enter: () => onHoverClimb(index),
@@ -88,7 +100,11 @@ export function renderChart(
       maintainAspectRatio: false,
       parsing: false,
       scales: {
-        x: { type: "linear", title: { display: true, text: i18n.t("chart-distance") } },
+        x: {
+          type: "linear",
+          bounds: "data",
+          title: { display: true, text: i18n.t("chart-distance") },
+        },
         y: { title: { display: true, text: i18n.t("chart-elevation") } },
       },
       plugins: {
@@ -104,7 +120,13 @@ export function renderChart(
         const band = chart.options.plugins?.annotation?.annotations;
         const entry = band === undefined ? undefined : Reflect.get(band, key);
         if (entry !== undefined && typeof entry === "object") {
-          Reflect.set(entry, "backgroundColor", index === climbIndex ? BAND_HIGHLIGHTED : BAND);
+          const chosen = index === climbIndex;
+          Reflect.set(entry, "backgroundColor", chosen ? BAND_HIGHLIGHTED : BAND);
+          Reflect.set(entry, "label", {
+            display: true,
+            content: chosen ? detail(index) : numbered(index),
+            position: { x: "center", y: "start" },
+          });
         }
       }
       chart.update("none");

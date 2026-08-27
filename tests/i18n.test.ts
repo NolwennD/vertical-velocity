@@ -58,29 +58,33 @@ describe("numbers follow the active locale", () => {
   });
 });
 
-describe("durations follow the active locale", () => {
+describe("durations read as minutes and seconds", () => {
   const expected = (lang: string, duration: Temporal.Duration): string =>
-    new Intl.DurationFormat(lang, { style: "narrow" }).format(
-      duration.round({ largestUnit: "hours", smallestUnit: "minutes" }),
+    new Intl.DurationFormat(lang, { style: "digital", hoursDisplay: "auto" }).format(
+      duration.round({ largestUnit: "hours", smallestUnit: "seconds" }),
     );
 
-  const AN_HOUR_AND_FIVE = Temporal.Duration.from({ seconds: 3925 });
+  const colons = (text: string): number => [...text].filter((sign) => sign === ":").length;
 
-  it("names the units the English way under en", () => {
-    expect(createI18n("en").formatDuration(AN_HOUR_AND_FIVE)).toBe(
-      expected("en", AN_HOUR_AND_FIVE),
-    );
+  it("writes a climb of under an hour as minutes and seconds", () => {
+    const half = Temporal.Duration.from({ seconds: 1783 });
+
+    expect(createI18n("en").formatDuration(half)).toBe(expected("en", half));
+    expect(colons(createI18n("en").formatDuration(half))).toBe(1);
   });
 
-  it("names the units the French way under fr", () => {
-    expect(createI18n("fr").formatDuration(AN_HOUR_AND_FIVE)).toBe(
-      expected("fr", AN_HOUR_AND_FIVE),
-    );
+  it("adds the hours only once the duration reaches one", () => {
+    const long = Temporal.Duration.from({ seconds: 3925 });
+
+    expect(colons(createI18n("fr").formatDuration(long))).toBe(2);
   });
 
-  it("drops the seconds, which no rider reads on a climb", () => {
-    expect(createI18n("en").formatDuration(Temporal.Duration.from({ seconds: 3929 }))).toBe(
-      createI18n("en").formatDuration(AN_HOUR_AND_FIVE),
+  it("keeps the seconds, which a rounded minute would hide", () => {
+    const longer = Temporal.Duration.from({ seconds: 324 });
+    const shorter = Temporal.Duration.from({ seconds: 276 });
+
+    expect(createI18n("en").formatDuration(longer)).not.toBe(
+      createI18n("en").formatDuration(shorter),
     );
   });
 });

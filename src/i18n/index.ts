@@ -55,8 +55,8 @@ export function createI18n(lang: Lang): I18n {
         maximumFractionDigits: 1,
       }).format(fraction),
     formatDuration: (duration) =>
-      new Intl.DurationFormat(lang, { style: "narrow" }).format(
-        duration.round({ largestUnit: "hours", smallestUnit: "minutes" }),
+      new Intl.DurationFormat(lang, { style: "digital", hoursDisplay: "auto" }).format(
+        duration.round({ largestUnit: "hours", smallestUnit: "seconds" }),
       ),
   };
 }

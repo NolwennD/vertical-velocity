@@ -12,6 +12,11 @@ const WITHOUT_ELEVATION = gpx(
    <trkpt lat="45.01" lon="6"><time>2024-01-01T10:00:30Z</time></trkpt>`,
 );
 
+const WITHOUT_CLIMB = gpx(
+  `<trkpt lat="45" lon="6"><ele>1000</ele><time>2024-01-01T10:00:00Z</time></trkpt>
+   <trkpt lat="45.001" lon="6"><ele>1001</ele><time>2024-01-01T10:00:30Z</time></trkpt>`,
+);
+
 const pick = (page: Page, name: string, body: string | Buffer) =>
   page.locator("#dropzone input[type=file]").setInputFiles({
     name,
@@ -91,6 +96,27 @@ const bandStrength = (page: Page) =>
     return strongest;
   });
 
+const labelInk = (page: Page) =>
+  page.evaluate(() => {
+    const canvas = document.querySelector("canvas");
+    const context = canvas?.getContext("2d");
+    if (canvas === null || context === null || context === undefined) {
+      return 0;
+    }
+    const height = Math.floor(canvas.height * 0.25);
+    const { data } = context.getImageData(0, 0, canvas.width, height);
+    let dark = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      if ((data[index] ?? 255) < 120 && (data[index + 3] ?? 0) > 0) {
+        dark += 1;
+      }
+    }
+    return dark;
+  });
+
+const canvasWidth = (page: Page) =>
+  page.evaluate(() => document.querySelector("canvas")?.width ?? 0);
+
 const canvasHeight = (page: Page) =>
   page.evaluate(() => document.querySelector("canvas")?.getBoundingClientRect().height ?? 0);
 
@@ -164,6 +190,7 @@ test("draws the elevation profile once a track is loaded", async ({ page }) => {
   await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
   await expect(message(page)).toContainText("3");
 
+  expect(await canvasWidth(page)).toBeGreaterThan(0);
   expect(await paintedPixels(page)).toBeGreaterThan(1000);
 });
 
@@ -204,11 +231,39 @@ test("holds the chart to a bounded height instead of growing without end", async
   expect(settled).toBeLessThanOrEqual(page.viewportSize()?.height ?? 720);
 });
 
-test("lists one row per detected climb, plus a summary row", async ({ page }) => {
+test("lists one row per detected climb, and nothing more", async ({ page }) => {
   await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
 
   await expect(page.locator("#table tbody tr")).toHaveCount(3);
-  await expect(page.locator("#table tfoot tr")).toHaveCount(1);
+  await expect(page.locator("#table tfoot")).toHaveCount(0);
+});
+
+test("gathers the cumulative figures in a summary of its own", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+
+  await expect(page.locator("#summary dt")).toHaveCount(4);
+  await expect(page.locator("#summary dd")).toHaveCount(4);
+  await expect(page.locator("#summary")).toContainText("Gain");
+  await expect(page.locator("#summary")).toContainText("Immobile");
+});
+
+test("labels the summary in the active language", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#summary")).toContainText("Gain");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(page.locator("#summary")).toContainText("Dénivelé");
+  await expect(page.locator("#summary")).toContainText("Immobilité");
+});
+
+test("clears the summary when the track cannot be analysed", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#summary dt")).toHaveCount(4);
+
+  await pick(page, "flat.gpx", WITHOUT_ELEVATION);
+
+  await expect(page.locator("#summary dt")).toHaveCount(0);
 });
 
 test("heads the table in the active language", async ({ page }) => {
@@ -235,4 +290,87 @@ test("deepens the matching band while a table row is hovered", async ({ page }) 
   await page.waitForTimeout(200);
 
   expect(await bandStrength(page)).toBeGreaterThan(resting);
+});
+
+test("heads each result section so screen readers can name it", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+
+  await expect(page.locator("main section:visible")).toHaveCount(3);
+  await expect(page.locator("main section:visible h2")).toHaveCount(3);
+});
+
+test("keeps the profile but drops the climb sections when no climb is found", async ({ page }) => {
+  await pick(page, "tiny.gpx", WITHOUT_CLIMB);
+  await expect(message(page)).toHaveText("No climb of at least 20 m was found.");
+
+  await expect(page.locator("#profile")).toBeVisible();
+  await expect(page.locator("#totals")).toBeHidden();
+  await expect(page.locator("#climbs")).toBeHidden();
+});
+
+test("drops every result section when the track cannot be analysed", async ({ page }) => {
+  await pick(page, "flat.gpx", WITHOUT_ELEVATION);
+
+  await expect(page.locator("main section:visible")).toHaveCount(0);
+});
+
+test("heads the sections in the active language", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#climbs h2")).toHaveText("Climbs");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(page.locator("#climbs h2")).toHaveText("Montées");
+});
+
+test("keeps every total joined to the label it belongs to", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+
+  const pairs = page.locator("#summary > div");
+  await expect(pairs).toHaveCount(4);
+
+  for (const pair of await pairs.all()) {
+    await expect(pair.locator("dt")).toHaveCount(1);
+    await expect(pair.locator("dd")).toHaveCount(1);
+  }
+});
+
+test("opens the climb's figures on its band while the row is hovered", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#table tbody tr")).toHaveCount(3);
+  const resting = await labelInk(page);
+
+  await page.locator("#table tbody tr").first().hover();
+  await page.waitForTimeout(300);
+
+  expect(await labelInk(page)).toBeGreaterThan(resting);
+});
+
+const velocityCell = (page: Page) => page.locator("#table tbody tr").last().locator("td").nth(7);
+
+test("re-reads the ride when the immobility radius changes", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#table tbody tr")).toHaveCount(3);
+  const strict = await velocityCell(page).textContent();
+
+  await page.locator("#immobility select").selectOption("12");
+
+  await expect(velocityCell(page)).not.toHaveText(strict ?? "");
+});
+
+test("labels the immobility control in the active language", async ({ page }) => {
+  await expect(page.locator("#immobility")).toContainText("Immobility");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(page.locator("#immobility")).toContainText("Immobilité");
+});
+
+test("keeps the chosen radius across a language change", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await page.locator("#immobility select").selectOption("12");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(page.locator("#immobility select")).toHaveValue("12");
 });

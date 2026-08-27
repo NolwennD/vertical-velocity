@@ -13,11 +13,23 @@
     </header>
     <main>
       <div id="dropzone"></div>
+      <div id="immobility"></div>
       <p id="message" hidden></p>
-      <div class="chart-container">
-        <canvas id="chart"></canvas>
-      </div>
-      <div id="table"></div>
+
+      <section id="profile" hidden>
+        <h2 data-title="section-profile">Elevation profile</h2>
+        <div class="chart-container"><canvas id="chart"></canvas></div>
+      </section>
+
+      <section id="totals" hidden>
+        <h2 data-title="section-totals">Totals</h2>
+        <dl id="summary"></dl>
+      </section>
+
+      <section id="climbs" hidden>
+        <h2 data-title="section-climbs">Climbs</h2>
+        <div id="table"></div>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

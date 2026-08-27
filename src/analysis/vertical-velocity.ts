@@ -35,11 +35,14 @@ const figuresOf = (climb: Climb, t: Thresholds): Figures => {
   const start = climb[0];
   const end = climb.at(-1) ?? start;
 
+  const moving = movingTime(climb, t);
+  const elapsed = end.time.since(start.time);
+
   return {
     gainM: end.smoothedEle - start.smoothedEle,
     distanceM: end.distanceM - start.distanceM,
-    moving: movingTime(climb, t),
-    elapsed: end.time.since(start.time),
+    moving,
+    elapsed,
   };
 };
 
