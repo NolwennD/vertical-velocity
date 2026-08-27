@@ -9,6 +9,7 @@
   "mutate": ["src/analysis/**/*.ts", "src/gpx/**/*.ts"],
   "ignorePatterns": ["test-results", "playwright-report", "coverage", ".nyc_output"],
   "reporters": ["progress", "clear-text", "html"],
+  "thresholds": { "break": 50 },
   "htmlReporter": {
     "fileName": "reports/mutation.html"
   },

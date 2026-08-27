@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # Du plus rapide et du plus informatif au plus lent, comme `pnpm check` en
+      # local : un type qui ne compile pas rend les verdicts suivants sans valeur.
+      - name: typecheck
+        run: pnpm typecheck
+
+      - name: format
+        run: pnpm format:check
+
+      - name: lint
+        run: pnpm lint
+
+      - name: test
+        run: pnpm test
+
+      # Seuil provisoire à 50 %, porté par les options de `nyc report`.
+      - name: coverage
+        run: pnpm coverage
+
+      # Seuil provisoire à 50 %, porté par `thresholds.break` de stryker.
+      - name: mutation
+        run: pnpm test:mutation
+
+      - name: build
+        run: pnpm build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports
+          path: |
+            coverage/
+            reports/
+            playwright-report/
+          retention-days: 7
+
+      # Le site n'est construit qu'une fois : `deploy` reprend cet artefact.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    # Une publication à la fois, et on n'interrompt pas celle qui est en vol :
+    # un déploiement coupé au milieu laisse le site dans un état indéterminé.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
