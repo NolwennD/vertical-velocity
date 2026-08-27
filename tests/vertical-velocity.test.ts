@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectClimbs } from "../src/analysis/climbs";
-import { detectImmobility } from "../src/analysis/immobility";
-import { smoothTrack } from "../src/analysis/smooth";
-import { analyseClimbs } from "../src/analysis/vertical-velocity";
+import { analyse, analyseClimbs } from "../src/analysis/vertical-velocity";
 import { DEFAULTS, type Thresholds } from "../src/constants";
 import { atLeastTwo, pointAt } from "./helpers/track";
 
@@ -11,8 +8,10 @@ const SPARSELY_RECORDED = { ...UNSMOOTHED, recordingGapS: 3600 };
 
 type Step = { meter: number; ele: number; second: number };
 
+const trackOf = (steps: readonly Step[]) => atLeastTwo(steps.map(pointAt));
+
 const climbsOf = (steps: readonly Step[], t: Thresholds = UNSMOOTHED) =>
-  detectClimbs(detectImmobility(smoothTrack(atLeastTwo(steps.map(pointAt)), t), t), t);
+  analyse(trackOf(steps), t).climbs;
 
 const phases = (legs: readonly { count: number; step: Step }[]): Step[] => {
   let last: Step = { meter: 0, ele: 1000, second: 0 };
@@ -32,6 +31,14 @@ const phases = (legs: readonly { count: number; step: Step }[]): Step[] => {
   return steps;
 };
 
+const SAWTOOTH = phases([
+  { count: 10, step: { meter: 10, ele: 5, second: 10 } },
+  { count: 10, step: { meter: 10, ele: -5, second: 10 } },
+  { count: 10, step: { meter: 10, ele: 5, second: 10 } },
+  { count: 10, step: { meter: 10, ele: -5, second: 10 } },
+  { count: 10, step: { meter: 10, ele: 5, second: 10 } },
+]);
+
 describe("vertical velocity is the elevation gain divided by the duration, in meters per hour", () => {
   it("reads 1200 m/h on a climb gaining 1200 m in one hour", () => {
     const climbs = climbsOf(phases([{ count: 100, step: { meter: 120, ele: 12, second: 36 } }]));
@@ -43,6 +50,14 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
         averageGrade: expect.closeTo(0.1, 6),
       },
     ]);
+  });
+
+  it("gives the two measures the very same value on a climb without a pause", () => {
+    const climbs = climbsOf(phases([{ count: 100, step: { meter: 120, ele: 12, second: 36 } }]));
+    const [stats] = analyseClimbs(climbs);
+
+    expect(stats).toBeDefined();
+    expect(stats?.verticalVelocityMoving).toBe(stats?.verticalVelocityElapsed);
   });
 
   it("reads the same 1200 m/h when the same gain and hour hold a flat in the middle", () => {
@@ -96,5 +111,25 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
         averageGrade: expect.closeTo(0.05, 6),
       },
     ]);
+  });
+});
+
+describe("analyse chains the steps and returns a coherent whole", () => {
+  it("keeps one analysed point per point of the track it was given", () => {
+    const track = trackOf(SAWTOOTH);
+
+    expect(analyse(track, UNSMOOTHED).track).toHaveLength(track.length);
+  });
+
+  it("returns climbs in order, without overlap", () => {
+    const { climbs } = analyse(trackOf(SAWTOOTH), UNSMOOTHED);
+
+    expect(climbs.length).toBeGreaterThan(1);
+    for (const [index, climb] of climbs.entries()) {
+      const previous = climbs[index - 1];
+      if (previous !== undefined) {
+        expect(climb[0].distanceM).toBeGreaterThanOrEqual(previous.at(-1)?.distanceM ?? 0);
+      }
+    }
   });
 });
