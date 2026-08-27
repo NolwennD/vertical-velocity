@@ -4,8 +4,10 @@ import { GpxError } from "./gpx/parser";
 import { parseGpx } from "./gpx/togeojson-adapter";
 import type { Lang } from "./i18n/dictionaries";
 import { createI18n, detectLanguage, type I18n } from "./i18n/index";
+import { type ChartHandle, renderChart } from "./ui/chart";
 import { mountDropzone } from "./ui/dropzone";
 import { mountLanguageSelect } from "./ui/language-select";
+import { renderTable } from "./ui/table";
 
 const STORAGE_KEY = "vertical-velocity.lang";
 
@@ -26,19 +28,40 @@ const say = (message: string): void => {
 };
 
 const report = (i18n: I18n, error: unknown): void => {
+  clearChart();
   say(error instanceof GpxError ? i18n.t(error.code) : String(error));
 };
 
 const show = (i18n: I18n, xml: string): void => {
   try {
-    const { climbs } = analyse(parse(xml));
-    say(climbs.length === 0 ? i18n.t("no-climbs") : `${i18n.formatNumber(climbs.length)} climbs`);
+    const analysis = analyse(parse(xml));
+    const { climbs } = analysis;
+
+    say(climbs.length === 0 ? i18n.t("no-climbs") : i18n.formatCount("climb-count", climbs.length));
+    clearChart();
+    chart = renderChart(canvas(), analysis, i18n, (index) => chart?.highlight(index));
+    renderTable(element("table"), climbs, i18n, (index) => chart?.highlight(index));
   } catch (error) {
     report(i18n, error);
   }
 };
 
 let loaded: File | undefined;
+let chart: ChartHandle | undefined;
+
+const canvas = (): HTMLCanvasElement => {
+  const found = element("chart");
+  if (!(found instanceof HTMLCanvasElement)) {
+    throw new Error("#chart is not a canvas");
+  }
+  return found;
+};
+
+const clearChart = (): void => {
+  chart?.destroy();
+  chart = undefined;
+  element("table").replaceChildren();
+};
 
 const display = (i18n: I18n, file: File): void => {
   file.text().then(

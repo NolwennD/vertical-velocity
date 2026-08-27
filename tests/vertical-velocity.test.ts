@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyse, analyseClimbs } from "../src/analysis/vertical-velocity";
+import { analyse, analyseClimbs, summarise } from "../src/analysis/vertical-velocity";
 import { DEFAULTS, type Thresholds } from "../src/constants";
 import { atLeastTwo, pointAt } from "./helpers/track";
 
@@ -43,7 +43,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
   it("reads 1200 m/h on a climb gaining 1200 m in one hour", () => {
     const climbs = climbsOf(phases([{ count: 100, step: { meter: 120, ele: 12, second: 36 } }]));
 
-    expect(analyseClimbs(climbs)).toEqual([
+    expect(analyseClimbs(climbs)).toMatchObject([
       {
         verticalVelocityMoving: 1200,
         verticalVelocityElapsed: 1200,
@@ -71,7 +71,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       SPARSELY_RECORDED,
     );
 
-    expect(analyseClimbs(climbs, SPARSELY_RECORDED)).toEqual([
+    expect(analyseClimbs(climbs, SPARSELY_RECORDED)).toMatchObject([
       {
         verticalVelocityMoving: 1200,
         verticalVelocityElapsed: 1200,
@@ -89,7 +89,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       ]),
     );
 
-    expect(analyseClimbs(climbs)).toEqual([
+    expect(analyseClimbs(climbs)).toMatchObject([
       {
         verticalVelocityMoving: 900,
         verticalVelocityElapsed: 600,
@@ -104,7 +104,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       { meter: 2000, ele: 1100, second: 3600 },
     ]);
 
-    expect(analyseClimbs(climbs)).toEqual([
+    expect(analyseClimbs(climbs)).toMatchObject([
       {
         verticalVelocityMoving: 0,
         verticalVelocityElapsed: 100,
@@ -131,5 +131,28 @@ describe("analyse chains the steps and returns a coherent whole", () => {
         expect(climb[0].distanceM).toBeGreaterThanOrEqual(previous.at(-1)?.distanceM ?? 0);
       }
     }
+  });
+});
+
+describe("the summary recomputes the velocities on the totals, it does not average them", () => {
+  const slow = climbsOf(phases([{ count: 180, step: { meter: 11, ele: 100 / 180, second: 60 } }]));
+  const fast = climbsOf(phases([{ count: 60, step: { meter: 33, ele: 100 / 60, second: 60 } }]));
+
+  it("adds up the gains and the distances", () => {
+    const total = summarise([...fast, ...slow]);
+
+    expect(total.gainM).toBeCloseTo(200, 6);
+    expect(total.distanceM).toBeCloseTo(60 * 33 + 180 * 11, 0);
+  });
+
+  it("divides the total gain by the total moving time, not the mean of the two rates", () => {
+    const total = summarise([...fast, ...slow]);
+    const [first, second] = analyseClimbs([...fast, ...slow]);
+    const averaged =
+      ((first?.verticalVelocityMoving ?? 0) + (second?.verticalVelocityMoving ?? 0)) / 2;
+
+    expect(total.verticalVelocityMoving).toBeCloseTo(50, 6);
+    expect(averaged).toBeCloseTo(200 / 3, 1);
+    expect(total.verticalVelocityMoving).not.toBeCloseTo(averaged, 1);
   });
 });

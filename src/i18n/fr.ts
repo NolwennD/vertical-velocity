@@ -22,4 +22,6 @@ export const fr: Record<MessageKey, string> = {
   "no-elevation": "Cette trace ne porte aucune altitude.",
   "no-time": "Cette trace ne porte aucun horodatage, aucune vitesse n'est calculable.",
   "no-climbs": "Aucune montée d'au moins 20 m n'a été trouvée.",
+  "climb-count-one": "{count} montée",
+  "climb-count-other": "{count} montées",
 };

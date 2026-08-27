@@ -20,6 +20,12 @@ export const en = {
   "no-elevation": "This track carries no elevation.",
   "no-time": "This track carries no timestamp, so no velocity can be computed.",
   "no-climbs": "No climb of at least 20 m was found.",
+  "climb-count-one": "{count} climb",
+  "climb-count-other": "{count} climbs",
 };
 
 export type MessageKey = keyof typeof en;
+
+type BaseOf<Key> = Key extends `${infer Base}-other` ? Base : never;
+
+export type CountKey = BaseOf<MessageKey>;

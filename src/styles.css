@@ -32,3 +32,8 @@ header {
   border-style: solid;
   padding: 0.5rem;
 }
+
+.chart-container {
+  height: 50vh;
+  position: relative;
+}

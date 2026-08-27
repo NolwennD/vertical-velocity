@@ -6,10 +6,24 @@ import { smoothTrack } from "./smooth";
 
 export type Analysis = { track: AnalysedTrack; climbs: readonly Climb[] };
 
-export type ClimbStats = {
+type Figures = {
+  gainM: number;
+  distanceM: number;
+  moving: Temporal.Duration;
+  elapsed: Temporal.Duration;
+};
+
+export type ClimbStats = Figures & {
+  averageGrade: number;
   verticalVelocityMoving: number;
   verticalVelocityElapsed: number;
-  averageGrade: number;
+};
+
+const NOTHING: Figures = {
+  gainM: 0,
+  distanceM: 0,
+  moving: Temporal.Duration.from({ seconds: 0 }),
+  elapsed: Temporal.Duration.from({ seconds: 0 }),
 };
 
 const perHour = (gain: number, duration: Temporal.Duration): number => {
@@ -17,21 +31,42 @@ const perHour = (gain: number, duration: Temporal.Duration): number => {
   return hours > 0 ? gain / hours : 0;
 };
 
-const statsOf = (climb: Climb, t: Thresholds): ClimbStats => {
+const figuresOf = (climb: Climb, t: Thresholds): Figures => {
   const start = climb[0];
   const end = climb.at(-1) ?? start;
 
-  const gain = end.smoothedEle - start.smoothedEle;
-  const distance = end.distanceM - start.distanceM;
   return {
-    verticalVelocityMoving: perHour(gain, movingTime(climb, t)),
-    verticalVelocityElapsed: perHour(gain, end.time.since(start.time)),
-    averageGrade: gain / distance,
+    gainM: end.smoothedEle - start.smoothedEle,
+    distanceM: end.distanceM - start.distanceM,
+    moving: movingTime(climb, t),
+    elapsed: end.time.since(start.time),
   };
 };
 
+const rated = (figures: Figures): ClimbStats => ({
+  ...figures,
+  averageGrade: figures.distanceM > 0 ? figures.gainM / figures.distanceM : 0,
+  verticalVelocityMoving: perHour(figures.gainM, figures.moving),
+  verticalVelocityElapsed: perHour(figures.gainM, figures.elapsed),
+});
+
 export function analyseClimbs(climbs: readonly Climb[], t: Thresholds = DEFAULTS): ClimbStats[] {
-  return climbs.map((climb) => statsOf(climb, t));
+  return climbs.map((climb) => rated(figuresOf(climb, t)));
+}
+
+export function summarise(climbs: readonly Climb[], t: Thresholds = DEFAULTS): ClimbStats {
+  return rated(
+    climbs.reduce((total, climb) => {
+      const figures = figuresOf(climb, t);
+
+      return {
+        gainM: total.gainM + figures.gainM,
+        distanceM: total.distanceM + figures.distanceM,
+        moving: total.moving.add(figures.moving),
+        elapsed: total.elapsed.add(figures.elapsed),
+      };
+    }, NOTHING),
+  );
 }
 
 export function analyse(points: Track, t: Thresholds = DEFAULTS): Analysis {

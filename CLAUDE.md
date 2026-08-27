@@ -35,6 +35,7 @@ pnpm typecheck      # tsc --noEmit
 pnpm lint           # biome lint, the linter alone
 pnpm test           # full suite
 pnpm test:e2e       # playwright, needs no running server: it starts its own
+pnpm test:e2e:ui    # the same, in UI mode: visible browser and time-travel
 pnpm test:mutation  # Stryker: measures what the tests actually catch
 pnpm test:related   # only the tests importing the files passed as arguments
 pnpm format         # biome format --write

@@ -33,7 +33,69 @@ const drop = async (page: Page, name: string, body: string) => {
 };
 
 const message = (page: Page) => page.locator("#message");
+
+const paintedPixels = (page: Page) =>
+  page.evaluate(() => {
+    const canvas = document.querySelector("canvas");
+    const context = canvas?.getContext("2d");
+    if (canvas === null || context === null || context === undefined) {
+      return 0;
+    }
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    let painted = 0;
+    for (let index = 3; index < data.length; index += 4) {
+      if ((data[index] ?? 0) > 0) {
+        painted += 1;
+      }
+    }
+    return painted;
+  });
 const zone = (page: Page) => page.locator(".dropzone");
+
+const bandSpans = (page: Page) =>
+  page.evaluate(() => {
+    const canvas = document.querySelector("canvas");
+    const context = canvas?.getContext("2d");
+    if (canvas === null || context === null || context === undefined) {
+      return 0;
+    }
+    const row = Math.floor(canvas.height * 0.3);
+    const { data } = context.getImageData(0, row, canvas.width, 1);
+    let spans = 0;
+    let inside = false;
+    for (let column = 0; column < canvas.width; column += 1) {
+      const offset = column * 4;
+      const reddish = (data[offset] ?? 0) - (data[offset + 2] ?? 0) > 12;
+      if (reddish && !inside) {
+        spans += 1;
+      }
+      inside = reddish;
+    }
+    return spans;
+  });
+
+const bandStrength = (page: Page) =>
+  page.evaluate(() => {
+    const canvas = document.querySelector("canvas");
+    const context = canvas?.getContext("2d");
+    if (canvas === null || context === null || context === undefined) {
+      return 0;
+    }
+    const row = Math.floor(canvas.height * 0.3);
+    const { data } = context.getImageData(0, row, canvas.width, 1);
+    let strongest = 0;
+    for (let column = 0; column < canvas.width; column += 1) {
+      const offset = column * 4;
+      strongest = Math.max(strongest, (data[offset] ?? 0) - (data[offset + 2] ?? 0));
+    }
+    return strongest;
+  });
+
+const canvasHeight = (page: Page) =>
+  page.evaluate(() => document.querySelector("canvas")?.getBoundingClientRect().height ?? 0);
+
+const canvasFingerprint = (page: Page) =>
+  page.evaluate(() => document.querySelector("canvas")?.toDataURL() ?? "");
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -70,6 +132,15 @@ test("translates the interface when the language changes", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
 });
 
+test("counts the climbs in the active language, plural included", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(message(page)).toHaveText("3 climbs");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(message(page)).toHaveText("3 montées");
+});
+
 test("keeps the loaded file and its verdict across a language change", async ({ page }) => {
   await pick(page, "flat.gpx", WITHOUT_ELEVATION);
   await expect(message(page)).toHaveText("This track carries no elevation.");
@@ -85,4 +156,83 @@ test("remembers the chosen language across a reload", async ({ page }) => {
   await page.reload();
 
   await expect(page.locator("#title")).toHaveText("Vitesse ascensionnelle");
+});
+
+test("draws the elevation profile once a track is loaded", async ({ page }) => {
+  expect(await paintedPixels(page)).toBe(0);
+
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(message(page)).toContainText("3");
+
+  expect(await paintedPixels(page)).toBeGreaterThan(1000);
+});
+
+test("leaves the canvas blank when the track cannot be analysed", async ({ page }) => {
+  await pick(page, "flat.gpx", WITHOUT_ELEVATION);
+  await expect(message(page)).toHaveText("This track carries no elevation.");
+
+  expect(await paintedPixels(page)).toBe(0);
+});
+
+test("marks each detected climb with its own band", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(message(page)).toContainText("3");
+
+  expect(await bandSpans(page)).toBe(3);
+});
+
+test("repaints the chart when the language changes", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(message(page)).toContainText("3");
+  const inEnglish = await canvasFingerprint(page);
+
+  await page.locator("#language select").selectOption("fr");
+  await expect(page.locator("#title")).toHaveText("Vitesse ascensionnelle");
+
+  expect(await canvasFingerprint(page)).not.toBe(inEnglish);
+});
+
+test("holds the chart to a bounded height instead of growing without end", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(message(page)).toContainText("3");
+
+  const settled = await canvasHeight(page);
+  await page.mouse.wheel(0, 2000);
+  await page.waitForTimeout(600);
+
+  expect(await canvasHeight(page)).toBe(settled);
+  expect(settled).toBeLessThanOrEqual(page.viewportSize()?.height ?? 720);
+});
+
+test("lists one row per detected climb, plus a summary row", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+
+  await expect(page.locator("#table tbody tr")).toHaveCount(3);
+  await expect(page.locator("#table tfoot tr")).toHaveCount(1);
+});
+
+test("heads the table in the active language", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#table thead")).toContainText("Gain");
+
+  await page.locator("#language select").selectOption("fr");
+
+  await expect(page.locator("#table thead")).toContainText("Dénivelé");
+});
+
+test("shows no table when the track cannot be analysed", async ({ page }) => {
+  await pick(page, "flat.gpx", WITHOUT_ELEVATION);
+
+  await expect(page.locator("#table table")).toHaveCount(0);
+});
+
+test("deepens the matching band while a table row is hovered", async ({ page }) => {
+  await pick(page, "real-file-anonymised.gpx", readFileSync(REAL_GPX));
+  await expect(page.locator("#table tbody tr")).toHaveCount(3);
+  const resting = await bandStrength(page);
+
+  await page.locator("#table tbody tr").first().hover();
+  await page.waitForTimeout(200);
+
+  expect(await bandStrength(page)).toBeGreaterThan(resting);
 });
