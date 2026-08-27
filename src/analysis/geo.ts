@@ -1,5 +1,8 @@
 import type { Track, TrackPoint } from "../gpx/parser";
-import type { NonEmptyArray } from "../type";
+import type { AtLeastTwo } from "../type";
+
+export type MeasuredPoint = TrackPoint & { distanceM: number };
+export type MeasuredTrack = AtLeastTwo<MeasuredPoint>;
 
 export const EARTH_RADIUS_M = 6_371_000;
 
@@ -17,16 +20,19 @@ export function haversine(a: TrackPoint, b: TrackPoint): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
 
-export function cumulativeDistances([first, ...rest]: Track): NonEmptyArray<number> {
-  const distances: [number, ...number[]] = [0];
-  let previous = first;
-  let total = 0;
+export function withDistances([first, second, ...rest]: Track): MeasuredTrack {
+  let total = haversine(first, second);
+  const measured: [MeasuredPoint, MeasuredPoint, ...MeasuredPoint[]] = [
+    { ...first, distanceM: 0 },
+    { ...second, distanceM: total },
+  ];
+  let previous = second;
 
   for (const point of rest) {
     total += haversine(previous, point);
-    distances.push(total);
+    measured.push({ ...point, distanceM: total });
     previous = point;
   }
 
-  return distances;
+  return measured;
 }

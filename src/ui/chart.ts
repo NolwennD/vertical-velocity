@@ -8,10 +8,11 @@ import {
   Tooltip,
 } from "chart.js";
 import annotationPlugin from "chartjs-plugin-annotation";
-import { type Analysis, analyseClimbs } from "../analysis/vertical-velocity";
+import type { Climb } from "../analysis/climbs";
+import { type Analysis, analyseClimb } from "../analysis/vertical-velocity";
 import type { Thresholds } from "../constants";
 import type { I18n } from "../i18n/index";
-import { figuresOf } from "./figures";
+import { figuresOf, METERS_PER_KILOMETER, numbered } from "./figures";
 
 Chart.register(
   LineController,
@@ -28,13 +29,8 @@ export type ChartHandle = {
   destroy(): void;
 };
 
-const METERS_PER_KILOMETER = 1000;
-const CIRCLED_ONE = 0x2460;
-
 const BAND = "rgba(220, 90, 60, 0.18)";
 const BAND_HIGHLIGHTED = "rgba(220, 90, 60, 0.42)";
-
-const numbered = (index: number): string => String.fromCodePoint(CIRCLED_ONE + index);
 
 export function renderChart(
   canvas: HTMLCanvasElement,
@@ -43,18 +39,10 @@ export function renderChart(
   t: Thresholds,
   onHoverClimb: (climbIndex: number | null) => void,
 ): ChartHandle {
-  const stats = analyseClimbs(analysis.climbs, t);
-
-  const detail = (index: number): string[] => {
-    const measured = stats[index];
-
-    return measured === undefined
-      ? [numbered(index)]
-      : [
-          numbered(index),
-          ...figuresOf(measured, i18n).map(([key, value]) => `${i18n.t(key)} ${value}`),
-        ];
-  };
+  const detail = (climb: Climb, index: number): string[] => [
+    numbered(index),
+    ...figuresOf(analyseClimb(climb, t), i18n).map(([key, value]) => `${i18n.t(key)} ${value}`),
+  ];
 
   const annotations = Object.fromEntries(
     analysis.climbs.map((climb, index) => {
@@ -116,15 +104,15 @@ export function renderChart(
 
   return {
     highlight: (climbIndex) => {
-      for (const [index, key] of Object.keys(annotations).entries()) {
+      for (const [index, climb] of analysis.climbs.entries()) {
         const band = chart.options.plugins?.annotation?.annotations;
-        const entry = band === undefined ? undefined : Reflect.get(band, key);
+        const entry = band === undefined ? undefined : Reflect.get(band, `climb-${index}`);
         if (entry !== undefined && typeof entry === "object") {
           const chosen = index === climbIndex;
           Reflect.set(entry, "backgroundColor", chosen ? BAND_HIGHLIGHTED : BAND);
           Reflect.set(entry, "label", {
             display: true,
-            content: chosen ? detail(index) : numbered(index),
+            content: chosen ? detail(climb, index) : numbered(index),
             position: { x: "center", y: "start" },
           });
         }

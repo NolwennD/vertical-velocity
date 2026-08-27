@@ -1,7 +1,7 @@
 import type { I18n } from "../i18n/index";
+import { METERS_PER_KILOMETER } from "./figures";
 
 const SECONDS_PER_HOUR = 3600;
-const METERS_PER_KILOMETER = 1000;
 
 export const RADII_M: readonly number[] = [3, 4, 6, 8, 12];
 

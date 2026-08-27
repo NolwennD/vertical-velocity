@@ -53,8 +53,8 @@ const rated = (figures: Figures): ClimbStats => ({
   verticalVelocityElapsed: perHour(figures.gainM, figures.elapsed),
 });
 
-export function analyseClimbs(climbs: readonly Climb[], t: Thresholds = DEFAULTS): ClimbStats[] {
-  return climbs.map((climb) => rated(figuresOf(climb, t)));
+export function analyseClimb(climb: Climb, t: Thresholds = DEFAULTS): ClimbStats {
+  return rated(figuresOf(climb, t));
 }
 
 export function summarise(climbs: readonly Climb[], t: Thresholds = DEFAULTS): ClimbStats {

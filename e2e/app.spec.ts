@@ -40,7 +40,9 @@ const drop = async (page: Page, name: string, body: string) => {
 
 const message = (page: Page) => page.locator("#message");
 
-const paintedPixels = (page: Page) =>
+const zone = (page: Page) => page.locator(".dropzone");
+
+const paintedPixels = (page: Page): Promise<number> =>
   page.evaluate(() => {
     const canvas = document.querySelector("canvas");
     const context = canvas?.getContext("2d");
@@ -48,56 +50,40 @@ const paintedPixels = (page: Page) =>
       return 0;
     }
     const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-    let painted = 0;
-    for (let index = 3; index < data.length; index += 4) {
-      if ((data[index] ?? 0) > 0) {
-        painted += 1;
-      }
-    }
-    return painted;
-  });
-const zone = (page: Page) => page.locator(".dropzone");
 
-const bandSpans = (page: Page) =>
+    return data.filter((alpha, index) => index % 4 === 3 && alpha > 0).length;
+  });
+
+// Ce qui traverse le pont est réduit dans la page : un nombre par colonne, pas
+// quatre par pixel. Les deux sondes de bande partagent ce relevé.
+const bandRedness = (page: Page): Promise<number[]> =>
   page.evaluate(() => {
     const canvas = document.querySelector("canvas");
     const context = canvas?.getContext("2d");
     if (canvas === null || context === null || context === undefined) {
-      return 0;
+      return [];
     }
     const row = Math.floor(canvas.height * 0.3);
     const { data } = context.getImageData(0, row, canvas.width, 1);
-    let spans = 0;
-    let inside = false;
-    for (let column = 0; column < canvas.width; column += 1) {
-      const offset = column * 4;
-      const reddish = (data[offset] ?? 0) - (data[offset + 2] ?? 0) > 12;
-      if (reddish && !inside) {
-        spans += 1;
-      }
-      inside = reddish;
-    }
-    return spans;
+
+    return Array.from(
+      { length: canvas.width },
+      (_, column) => (data[column * 4] ?? 0) - (data[column * 4 + 2] ?? 0),
+    );
   });
 
-const bandStrength = (page: Page) =>
-  page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    const context = canvas?.getContext("2d");
-    if (canvas === null || context === null || context === undefined) {
-      return 0;
-    }
-    const row = Math.floor(canvas.height * 0.3);
-    const { data } = context.getImageData(0, row, canvas.width, 1);
-    let strongest = 0;
-    for (let column = 0; column < canvas.width; column += 1) {
-      const offset = column * 4;
-      strongest = Math.max(strongest, (data[offset] ?? 0) - (data[offset + 2] ?? 0));
-    }
-    return strongest;
-  });
+const REDDISH = 12;
 
-const labelInk = (page: Page) =>
+const bandSpans = async (page: Page): Promise<number> => {
+  const reddish = (await bandRedness(page)).map((red) => red > REDDISH);
+
+  return reddish.filter((red, column) => red && !reddish[column - 1]).length;
+};
+
+const bandStrength = async (page: Page): Promise<number> =>
+  Math.max(0, ...(await bandRedness(page)));
+
+const labelInk = (page: Page): Promise<number> =>
   page.evaluate(() => {
     const canvas = document.querySelector("canvas");
     const context = canvas?.getContext("2d");
@@ -106,13 +92,10 @@ const labelInk = (page: Page) =>
     }
     const height = Math.floor(canvas.height * 0.25);
     const { data } = context.getImageData(0, 0, canvas.width, height);
-    let dark = 0;
-    for (let index = 0; index < data.length; index += 4) {
-      if ((data[index] ?? 255) < 120 && (data[index + 3] ?? 0) > 0) {
-        dark += 1;
-      }
-    }
-    return dark;
+
+    return data.filter(
+      (_, index) => index % 4 === 0 && (data[index] ?? 255) < 120 && (data[index + 3] ?? 0) > 0,
+    ).length;
   });
 
 const canvasWidth = (page: Page) =>

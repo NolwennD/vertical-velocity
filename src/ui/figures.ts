@@ -2,7 +2,11 @@ import type { ClimbStats } from "../analysis/vertical-velocity";
 import type { MessageKey } from "../i18n/en";
 import type { I18n } from "../i18n/index";
 
-const METERS_PER_KILOMETER = 1000;
+export const METERS_PER_KILOMETER = 1000;
+
+const CIRCLED_ONE = 0x2460;
+
+export const numbered = (index: number): string => String.fromCodePoint(CIRCLED_ONE + index);
 
 export const figuresOf = (stats: ClimbStats, i18n: I18n): readonly [MessageKey, string][] => [
   ["table-gain", `${i18n.formatNumber(stats.gainM)} m`],

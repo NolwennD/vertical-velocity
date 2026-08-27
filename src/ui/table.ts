@@ -1,11 +1,9 @@
 import type { Climb } from "../analysis/climbs";
-import { analyseClimbs } from "../analysis/vertical-velocity";
+import { analyseClimb } from "../analysis/vertical-velocity";
 import type { Thresholds } from "../constants";
 import type { MessageKey } from "../i18n/en";
 import type { I18n } from "../i18n/index";
-import { figuresOf } from "./figures";
-
-const CIRCLED_ONE = 0x2460;
+import { figuresOf, numbered } from "./figures";
 
 const HEADERS: readonly MessageKey[] = [
   "table-number",
@@ -19,8 +17,6 @@ const HEADERS: readonly MessageKey[] = [
   "table-vertical-velocity-moving",
   "table-vertical-velocity-elapsed",
 ];
-
-const numbered = (index: number): string => String.fromCodePoint(CIRCLED_ONE + index);
 
 const row = (cells: readonly string[], tag: "td" | "th"): HTMLTableRowElement => {
   const line = document.createElement("tr");
@@ -41,13 +37,6 @@ export function renderTable(
   t: Thresholds,
   onHoverClimb: (climbIndex: number | null) => void,
 ): void {
-  if (climbs.length === 0) {
-    root.replaceChildren();
-    return;
-  }
-
-  const stats = analyseClimbs(climbs, t);
-
   const head = document.createElement("thead");
   head.append(
     row(
@@ -58,17 +47,12 @@ export function renderTable(
 
   const body = document.createElement("tbody");
   for (const [index, climb] of climbs.entries()) {
-    const measured = stats[index];
-    if (measured === undefined) {
-      continue;
-    }
-
     const line = row(
       [
         numbered(index),
         `${i18n.formatNumber(climb[0].smoothedEle)} m`,
         `${i18n.formatNumber(climb.at(-1)?.smoothedEle ?? 0)} m`,
-        ...figuresOf(measured, i18n).map(([, value]) => value),
+        ...figuresOf(analyseClimb(climb, t), i18n).map(([, value]) => value),
       ],
       "td",
     );

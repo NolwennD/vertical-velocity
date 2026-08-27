@@ -14,7 +14,6 @@ export type GpxErrorCode = "invalid-xml" | "no-track-points" | "no-elevation" | 
 export class GpxError extends Error {
   constructor(readonly code: GpxErrorCode) {
     super(code);
-    this.name = "GpxError";
   }
 }
 

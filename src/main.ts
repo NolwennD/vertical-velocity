@@ -44,20 +44,25 @@ const show = (i18n: I18n, xml: string): void => {
     const analysis = analyse(parse(xml), thresholds);
     const { climbs } = analysis;
 
-    say(climbs.length === 0 ? i18n.t("no-climbs") : i18n.formatCount("climb-count", climbs.length));
+    const found = climbs.length > 0;
+
+    say(found ? i18n.formatCount("climb-count", climbs.length) : i18n.t("no-climbs"));
     clearChart();
 
     reveal("profile", true);
-    reveal("totals", climbs.length > 0);
-    reveal("climbs", climbs.length > 0);
+    reveal("totals", found);
+    reveal("climbs", found);
 
     chart = renderChart(canvas(), analysis, i18n, thresholds, (index: number | null) =>
       chart?.highlight(index),
     );
-    renderSummary(element("summary"), climbs, i18n, thresholds);
-    renderTable(element("table"), climbs, i18n, thresholds, (index: number | null) =>
-      chart?.highlight(index),
-    );
+
+    if (found) {
+      renderSummary(element("summary"), climbs, i18n, thresholds);
+      renderTable(element("table"), climbs, i18n, thresholds, (index: number | null) =>
+        chart?.highlight(index),
+      );
+    }
   } catch (error) {
     report(i18n, error);
   }

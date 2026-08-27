@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { cumulativeDistances, haversine } from "../src/analysis/geo";
+import { haversine, withDistances } from "../src/analysis/geo";
 import type { Track, TrackPoint } from "../src/gpx/parser";
 
 /** Demi-circonférence terrestre, en mètres : la distance de deux antipodes. */
@@ -107,11 +107,13 @@ describe("haversine, propriétés d'une distance sur la sphère", () => {
   });
 });
 
-describe("cumulativeDistances, propriétés d'une distance cumulée le long d'une track", () => {
+const distances = (track: Track): number[] => withDistances(track).map((point) => point.distanceM);
+
+describe("withDistances, propriétés d'une distance cumulée le long d'une track", () => {
   it("rend un tableau de la longueur de l'entrée", () => {
     fc.assert(
       fc.property(arbitraryTrack, (track) => {
-        expect(cumulativeDistances(track)).toHaveLength(track.length);
+        expect(distances(track)).toHaveLength(track.length);
       }),
     );
   });
@@ -119,7 +121,7 @@ describe("cumulativeDistances, propriétés d'une distance cumulée le long d'un
   it("commence par 0", () => {
     fc.assert(
       fc.property(arbitraryTrack, (track) => {
-        expect(cumulativeDistances(track)[0]).toBe(0);
+        expect(distances(track)[0]).toBe(0);
       }),
     );
   });
@@ -129,7 +131,7 @@ describe("cumulativeDistances, propriétés d'une distance cumulée le long d'un
       fc.property(arbitraryTrack, (track) => {
         let previous = Number.NEGATIVE_INFINITY;
 
-        for (const distance of cumulativeDistances(track)) {
+        for (const distance of distances(track)) {
           expect(distance).toBeGreaterThanOrEqual(previous);
           previous = distance;
         }
@@ -149,7 +151,7 @@ describe("cumulativeDistances, propriétés d'une distance cumulée le long d'un
         const [first] = track;
         const last = track.at(-1);
         const chord = last === undefined ? Number.NaN : haversine(first, last);
-        const cumulative = cumulativeDistances(track).at(-1) ?? Number.NaN;
+        const cumulative = distances(track).at(-1) ?? Number.NaN;
 
         expect(chord).toBeLessThanOrEqual(cumulative + RELATIVE_MARGIN * cumulative + FLOOR_METER);
       }),

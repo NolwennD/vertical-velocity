@@ -1,6 +1,6 @@
 import { DOMParser } from "@xmldom/xmldom";
 import { describe, expect, it } from "vitest";
-import { analyse, analyseClimbs } from "../src/analysis/vertical-velocity";
+import { analyse, analyseClimb } from "../src/analysis/vertical-velocity";
 import { parseGpx } from "../src/gpx/togeojson-adapter";
 import cyclingGpx from "./fixtures/cycling-anonymised.gpx?raw";
 import walkGpx from "./fixtures/walk-anonymised.gpx?raw";
@@ -31,7 +31,7 @@ describe("the recorded walk is read at a walking pace", () => {
   });
 
   it("never credits the walker with a pace no walker holds uphill", () => {
-    for (const stats of analyseClimbs(climbs)) {
+    for (const stats of climbs.map((climb) => analyseClimb(climb))) {
       const hours = stats.moving.total("hours");
 
       expect(stats.distanceM / 1000 / hours).toBeLessThan(5);

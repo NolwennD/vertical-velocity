@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cumulativeDistances, haversine } from "../src/analysis/geo";
+import { haversine, withDistances } from "../src/analysis/geo";
 import type { Track, TrackPoint } from "../src/gpx/parser";
 import { LATITUDE_DEGREES_PER_METER } from "./helpers/track";
 
@@ -47,11 +47,13 @@ describe("haversine returns the great-circle distance between two points, in met
 const pointAtIndex = (index: number): TrackPoint =>
   point(45 + index * SPACING_METER * LATITUDE_DEGREES_PER_METER, 6);
 
-describe("cumulativeDistances rend une distance par point de la trace, commençant à 0 et croissante", () => {
+const distances = (track: Track): number[] => withDistances(track).map((point) => point.distanceM);
+
+describe("withDistances porte une distance par point, commençant à 0 et croissante", () => {
   it("rend [0, ~100, ~200] pour trois points alignés espacés de 100 m", () => {
     const track: Track = [pointAtIndex(0), pointAtIndex(1), pointAtIndex(2)];
 
-    expect(cumulativeDistances(track)).toEqual([
+    expect(distances(track)).toEqual([
       0,
       expect.closeTo(SPACING_METER, MILLIMETER_DIGITS),
       expect.closeTo(2 * SPACING_METER, MILLIMETER_DIGITS),
@@ -67,11 +69,9 @@ describe("cumulativeDistances rend une distance par point de la trace, commença
       pointAtIndex(2),
     ];
 
-    const distances = cumulativeDistances(track);
-
     let previous = Number.NEGATIVE_INFINITY;
 
-    for (const distance of distances) {
+    for (const distance of distances(track)) {
       expect(distance).toBeGreaterThanOrEqual(previous);
       previous = distance;
     }

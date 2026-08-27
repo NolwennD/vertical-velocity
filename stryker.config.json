@@ -7,12 +7,10 @@
   "cleanTempDir": "always",
   "tsconfigFile": "tsconfig.stryker-noop.json",
   "mutate": ["src/analysis/**/*.ts", "src/gpx/**/*.ts"],
+  "ignorePatterns": ["test-results", "playwright-report", "coverage", ".nyc_output"],
   "reporters": ["progress", "clear-text", "html"],
   "htmlReporter": {
     "fileName": "reports/mutation.html"
-  },
-  "typescriptChecker": {
-    "experimentalNativePreview": true
   },
   "timeoutMS": 20000
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyse, analyseClimbs, summarise } from "../src/analysis/vertical-velocity";
+import { analyse, analyseClimb, summarise } from "../src/analysis/vertical-velocity";
 import { DEFAULTS, type Thresholds } from "../src/constants";
 import { atLeastTwo, pointAt } from "./helpers/track";
 
@@ -43,7 +43,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
   it("reads 1200 m/h on a climb gaining 1200 m in one hour", () => {
     const climbs = climbsOf(phases([{ count: 100, step: { meter: 120, ele: 12, second: 36 } }]));
 
-    expect(analyseClimbs(climbs)).toMatchObject([
+    expect(climbs.map((climb) => analyseClimb(climb))).toMatchObject([
       {
         verticalVelocityMoving: 1200,
         verticalVelocityElapsed: 1200,
@@ -54,7 +54,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
 
   it("gives the two measures the very same value on a climb without a pause", () => {
     const climbs = climbsOf(phases([{ count: 100, step: { meter: 120, ele: 12, second: 36 } }]));
-    const [stats] = analyseClimbs(climbs);
+    const [stats] = climbs.map((climb) => analyseClimb(climb));
 
     expect(stats).toBeDefined();
     expect(stats?.verticalVelocityMoving).toBe(stats?.verticalVelocityElapsed);
@@ -71,7 +71,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       SPARSELY_RECORDED,
     );
 
-    expect(analyseClimbs(climbs, SPARSELY_RECORDED)).toMatchObject([
+    expect(climbs.map((climb) => analyseClimb(climb, SPARSELY_RECORDED))).toMatchObject([
       {
         verticalVelocityMoving: 1200,
         verticalVelocityElapsed: 1200,
@@ -89,7 +89,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       ]),
     );
 
-    expect(analyseClimbs(climbs)).toMatchObject([
+    expect(climbs.map((climb) => analyseClimb(climb))).toMatchObject([
       {
         verticalVelocityMoving: 900,
         verticalVelocityElapsed: 600,
@@ -104,7 +104,7 @@ describe("vertical velocity is the elevation gain divided by the duration, in me
       { meter: 2000, ele: 1100, second: 3600 },
     ]);
 
-    expect(analyseClimbs(climbs)).toMatchObject([
+    expect(climbs.map((climb) => analyseClimb(climb))).toMatchObject([
       {
         verticalVelocityMoving: 0,
         verticalVelocityElapsed: 100,
@@ -147,7 +147,7 @@ describe("the summary recomputes the velocities on the totals, it does not avera
 
   it("divides the total gain by the total moving time, not the mean of the two rates", () => {
     const total = summarise([...fast, ...slow]);
-    const [first, second] = analyseClimbs([...fast, ...slow]);
+    const [first, second] = [...fast, ...slow].map((climb) => analyseClimb(climb));
     const averaged =
       ((first?.verticalVelocityMoving ?? 0) + (second?.verticalVelocityMoving ?? 0)) / 2;
 

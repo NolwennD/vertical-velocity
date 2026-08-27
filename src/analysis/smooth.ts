@@ -1,9 +1,9 @@
 import { DEFAULTS, type Thresholds } from "../constants";
-import type { Track, TrackPoint } from "../gpx/parser";
+import type { Track } from "../gpx/parser";
 import { type AtLeastTwo, mapAtLeastTwo } from "../type";
-import { cumulativeDistances } from "./geo";
+import { type MeasuredPoint, withDistances } from "./geo";
 
-export type SmoothedPoint = TrackPoint & { smoothedEle: number; distanceM: number };
+export type SmoothedPoint = MeasuredPoint & { smoothedEle: number };
 export type SmoothedTrack = AtLeastTwo<SmoothedPoint>;
 
 const median = (values: readonly number[]): number | undefined =>
@@ -51,10 +51,8 @@ const movingAverage = (track: SmoothedTrack, windowMeter: number): SmoothedTrack
 };
 
 export function smoothTrack(points: Track, t: Thresholds = DEFAULTS): SmoothedTrack {
-  const cumulative = cumulativeDistances(points);
-  const enriched = mapAtLeastTwo(points, (point, index) => ({
+  const enriched = mapAtLeastTwo(withDistances(points), (point) => ({
     ...point,
-    distanceM: cumulative[index] ?? 0,
     smoothedEle: point.ele,
   }));
 

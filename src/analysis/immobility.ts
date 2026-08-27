@@ -9,13 +9,12 @@ export type AnalysedTrack = AtLeastTwo<AnalysedPoint>;
 const ZERO = Temporal.Duration.from({ seconds: 0 });
 
 export function detectImmobility(track: SmoothedTrack, t: Thresholds = DEFAULTS): AnalysedTrack {
-  const immobile: boolean[] = track.map(() => false);
-  let start = 0;
+  const immobile = new Set<number>();
+  let resumeAt = 0;
 
-  while (start < track.length) {
-    const anchor = track[start];
-    if (anchor === undefined) {
-      break;
+  for (const [start, anchor] of track.entries()) {
+    if (start < resumeAt) {
+      continue;
     }
 
     let end = start;
@@ -29,37 +28,30 @@ export function detectImmobility(track: SmoothedTrack, t: Thresholds = DEFAULTS)
       last = candidate;
     }
 
-    const held = last.time.since(anchor.time).total("seconds") >= t.stopMinDurationS;
-
-    if (held) {
+    if (last.time.since(anchor.time).total("seconds") >= t.stopMinDurationS) {
       for (let index = start; index <= end; index += 1) {
-        immobile[index] = true;
+        immobile.add(index);
       }
-      start = end + 1;
-    } else {
-      start += 1;
+      resumeAt = end + 1;
     }
   }
 
-  return mapAtLeastTwo(track, (point, index) => ({ ...point, immobile: immobile[index] ?? false }));
+  return mapAtLeastTwo(track, (point, index) => ({ ...point, immobile: immobile.has(index) }));
 }
 
 export function movingTime(track: AnalysedTrack, t: Thresholds = DEFAULTS): Temporal.Duration {
+  const [first, ...rest] = track;
   let moving = ZERO;
+  let previous = first;
 
-  for (let index = 0; index < track.length - 1; index += 1) {
-    const from = track[index];
-    const to = track[index + 1];
-    if (from === undefined || to === undefined) {
-      continue;
-    }
-
-    const elapsed = to.time.since(from.time);
+  for (const point of rest) {
+    const elapsed = point.time.since(previous.time);
     const unrecorded = elapsed.total("seconds") > t.recordingGapS;
 
-    if (!(unrecorded || (from.immobile && to.immobile))) {
+    if (!(unrecorded || (previous.immobile && point.immobile))) {
       moving = moving.add(elapsed);
     }
+    previous = point;
   }
 
   return moving;

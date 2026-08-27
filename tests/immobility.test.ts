@@ -101,6 +101,19 @@ describe("a point is immobile when it stays within six meters for at least twent
   });
 });
 
+describe("an immobile stretch consumes its points, the next search starts past its last one", () => {
+  it("leaves out the point a window re-anchored inside the stretch would have swallowed", () => {
+    const track = trackOf([
+      { meter: 0, second: 0 },
+      { meter: 2, second: 10 },
+      { meter: 4, second: 25 },
+      { meter: 7, second: 35 },
+    ]);
+
+    expect(immobilityOf(track)).toEqual([true, true, true, false]);
+  });
+});
+
 describe("an interval longer than sixty seconds is never counted as movement", () => {
   it("leaves a ten minute jump between two distant points out of the moving time", () => {
     const track = trackOf([
