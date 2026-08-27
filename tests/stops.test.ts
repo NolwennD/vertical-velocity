@@ -1,13 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { EARTH_RADIUS_M } from "../src/analysis/geo";
 import { smoothTrack } from "../src/analysis/smooth";
 import { type AnalysedTrack, detectStops, timeBreakdown } from "../src/analysis/stops";
-import type { Track, TrackPoint } from "../src/gpx/parser";
+import type { Track } from "../src/gpx/parser";
 import { mapAtLeastTwo } from "../src/type";
+import { atLeastTwo, pointAt } from "./helpers/track";
 
-const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
-const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
 const NANOSECOND_DIGITS = 9;
 const WALKING_METER_PER_SECOND = 4000 / 3600;
 const RIDING_METER_PER_SECOND = 10;
@@ -17,20 +15,8 @@ const FLAG_COUNT = 2 + MAX_EXTRA_STEPS;
 
 type Sample = { meter: number; second: number };
 
-const point = ({ meter, second }: Sample): TrackPoint => ({
-  lat: 45 + meter * LATITUDE_DEGREES_PER_METER,
-  lon: 6,
-  ele: 1000,
-  time: EPOCH.add({ seconds: second }),
-});
-
-const trackOf = (samples: readonly Sample[]): Track => {
-  const [first, second, ...rest] = samples.map(point);
-  if (first === undefined || second === undefined) {
-    throw new Error("a track needs at least two samples");
-  }
-  return [first, second, ...rest];
-};
+const trackOf = (samples: readonly Sample[]): Track =>
+  atLeastTwo(samples.map(({ meter, second }) => pointAt({ meter, ele: 1000, second })));
 
 const walk = (count: number, from: Sample, meterPerSecond: number): Sample[] =>
   Array.from({ length: count }, (_, index) => ({

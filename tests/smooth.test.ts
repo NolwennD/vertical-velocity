@@ -1,24 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { EARTH_RADIUS_M } from "../src/analysis/geo";
 import { smoothTrack } from "../src/analysis/smooth";
-import type { Track, TrackPoint } from "../src/gpx/parser";
+import type { Track } from "../src/gpx/parser";
+import { atLeastTwo, pointAt } from "./helpers/track";
 
-const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
-
-const point = (ele: number, index: number, spacingMeter: number): TrackPoint => ({
-  lat: 45 + index * spacingMeter * LATITUDE_DEGREES_PER_METER,
-  lon: 6,
-  ele,
-  time: Temporal.Instant.fromEpochMilliseconds(0),
-});
-
-const trackOf = (elevations: readonly number[], spacingMeter: number): Track => {
-  const [first, second, ...rest] = elevations.map((ele, index) => point(ele, index, spacingMeter));
-  if (first === undefined || second === undefined) {
-    throw new Error("a track needs at least two elevations");
-  }
-  return [first, second, ...rest];
-};
+const trackOf = (elevations: readonly number[], spacingMeter: number): Track =>
+  atLeastTwo(elevations.map((ele, index) => pointAt({ meter: index * spacingMeter, ele })));
 
 const at = (values: readonly number[], index: number): number => values[index] ?? Number.NaN;
 

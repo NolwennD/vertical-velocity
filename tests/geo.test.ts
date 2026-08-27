@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cumulativeDistances, EARTH_RADIUS_M, haversine } from "../src/analysis/geo";
+import { cumulativeDistances, haversine } from "../src/analysis/geo";
 import type { Track, TrackPoint } from "../src/gpx/parser";
+import { LATITUDE_DEGREES_PER_METER } from "./helpers/track";
 
 const LATITUDE_DEGREE_METER = 111_195;
 const RELATIVE_TOLERANCE = 0.001;
-const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
 const SPACING_METER = 100;
 const MILLIMETER_DIGITS = 3;
 
