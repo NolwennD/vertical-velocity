@@ -1,3 +1,5 @@
+import type { AtLeastTwo } from "../type";
+
 export type TrackPoint = {
   lat: number;
   lon: number;
@@ -5,7 +7,7 @@ export type TrackPoint = {
   time: Temporal.Instant;
 };
 
-export type Track = readonly [TrackPoint, TrackPoint, ...TrackPoint[]];
+export type Track = AtLeastTwo<TrackPoint>;
 
 export type GpxErrorCode = "invalid-xml" | "no-track-points" | "no-elevation" | "no-time";
 

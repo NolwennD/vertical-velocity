@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { smoothElevations } from "../src/analysis/smooth";
+import { EARTH_RADIUS_M } from "../src/analysis/geo";
+import { smoothTrack } from "../src/analysis/smooth";
 import type { Track, TrackPoint } from "../src/gpx/parser";
 
-const point = (ele: number): TrackPoint => ({
-  lat: 45,
+const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
+
+const point = (ele: number, index: number, spacingMeter: number): TrackPoint => ({
+  lat: 45 + index * spacingMeter * LATITUDE_DEGREES_PER_METER,
   lon: 6,
   ele,
   time: Temporal.Instant.fromEpochMilliseconds(0),
 });
 
-const trackOf = (elevations: readonly number[]): Track => {
-  const [first, second, ...rest] = elevations.map(point);
+const trackOf = (elevations: readonly number[], spacingMeter: number): Track => {
+  const [first, second, ...rest] = elevations.map((ele, index) => point(ele, index, spacingMeter));
   if (first === undefined || second === undefined) {
     throw new Error("a track needs at least two elevations");
   }
@@ -22,11 +25,8 @@ const at = (values: readonly number[], index: number): number => values[index] ?
 const ramp = (count: number, spacingMeter: number, grade: number): number[] =>
   Array.from({ length: count }, (_, index) => 1000 + index * spacingMeter * grade);
 
-const smooth = (elevations: readonly number[], spacingMeter: number) =>
-  smoothElevations(
-    trackOf(elevations),
-    Array.from({ length: elevations.length }, (_, index) => index * spacingMeter),
-  );
+const smooth = (elevations: readonly number[], spacingMeter: number): number[] =>
+  smoothTrack(trackOf(elevations, spacingMeter)).map((point) => point.smoothedEle);
 
 const withSpike = (elevations: readonly number[], index: number, offset: number): number[] =>
   elevations.map((ele, current) => (current === index ? ele + offset : ele));
@@ -89,6 +89,30 @@ describe("the moving average works on a window expressed in meters, not in point
 
     expect(at(smoothed, 5)).toBeCloseTo(1000, 1);
     expect(at(smoothed, 55)).toBeCloseTo(at(elevations, 55), 0);
+  });
+});
+
+describe("each point carries its raw elevation alongside the smoothed one", () => {
+  it("keeps the spike in ele and removes it from smoothedEle", () => {
+    const clean = ramp(21, 10, 0.05);
+    const track = smoothTrack(trackOf(withSpike(clean, 10, 40), 10));
+
+    const spiked = track.at(10);
+
+    expect(spiked?.ele).toBeCloseTo(at(clean, 10) + 40, 0);
+    expect(spiked?.smoothedEle).toBeCloseTo(at(clean, 10), 0);
+  });
+
+  it("measures each point's distance from the start of the track", () => {
+    const track = smoothTrack(trackOf(ramp(5, 10, 0.05), 10));
+
+    expect(track.map((point) => point.distanceM)).toEqual([
+      0,
+      expect.closeTo(10, 3),
+      expect.closeTo(20, 3),
+      expect.closeTo(30, 3),
+      expect.closeTo(40, 3),
+    ]);
   });
 });
 
