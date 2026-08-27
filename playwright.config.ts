@@ -10,6 +10,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev",
     url: BASE_URL,
-    reuseExistingServer: true,
+    // Un serveur déjà debout n'est pas instrumenté : sous couverture, en démarrer un.
+    reuseExistingServer: !process.env.VITE_COVERAGE,
   },
 });

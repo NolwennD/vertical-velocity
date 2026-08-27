@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./coverage";
 
 const CYCLING_GPX = "tests/fixtures/cycling-anonymised.gpx";
 

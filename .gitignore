@@ -8,6 +8,7 @@ public/
 
 # Sorties de test
 coverage/
+.nyc_output/
 test-results/
 playwright-report/
 .playwright/
