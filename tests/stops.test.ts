@@ -1,8 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { EARTH_RADIUS_M } from "../src/analysis/geo";
-import { findStops, timeBreakdown } from "../src/analysis/stops";
+import { smoothTrack } from "../src/analysis/smooth";
+import { type AnalysedTrack, detectStops, timeBreakdown } from "../src/analysis/stops";
 import type { Track, TrackPoint } from "../src/gpx/parser";
+import { mapAtLeastTwo } from "../src/type";
 
 const LATITUDE_DEGREES_PER_METER = 180 / (Math.PI * EARTH_RADIUS_M);
 const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
@@ -38,6 +40,15 @@ const walk = (count: number, from: Sample, meterPerSecond: number): Sample[] =>
 
 const repeat = (count: number, flag: boolean): boolean[] => Array<boolean>(count).fill(flag);
 
+const stopsOf = (track: Track): readonly boolean[] =>
+  detectStops(smoothTrack(track)).map((point) => point.stopped);
+
+const analysed = (track: Track, flags: readonly boolean[]): AnalysedTrack =>
+  mapAtLeastTwo(smoothTrack(track), (point, index) => ({
+    ...point,
+    stopped: flags[index] ?? false,
+  }));
+
 const seconds = (duration: Temporal.Duration): number => duration.total("seconds");
 
 const cumulated = (steps: readonly Sample[]): Sample[] => {
@@ -65,37 +76,38 @@ const arbitraryTrack = fc
 
 const arbitraryFlags = fc.array(fc.boolean(), { minLength: FLAG_COUNT, maxLength: FLAG_COUNT });
 
-const timeOf = (track: Track, index: number): Temporal.Instant => (track[index] ?? track[0]).time;
+const timeOf = (track: AnalysedTrack, index: number): Temporal.Instant =>
+  (track[index] ?? track[0]).time;
 
 describe("a stop is at least ten seconds of immobility within a six meter radius", () => {
   it("marks thirty seconds spent at the same position", () => {
     const track = trackOf(walk(31, { meter: 0, second: 0 }, 0));
 
-    expect(findStops(track)).toEqual(repeat(31, true));
+    expect(stopsOf(track)).toEqual(repeat(31, true));
   });
 
   it("marks ten seconds spent at the same position, the shortest stop there is", () => {
     const track = trackOf(walk(11, { meter: 0, second: 0 }, 0));
 
-    expect(findStops(track)).toEqual(repeat(11, true));
+    expect(stopsOf(track)).toEqual(repeat(11, true));
   });
 
   it("leaves six seconds at the same position unmarked, too brief to be a stop", () => {
     const track = trackOf(walk(7, { meter: 0, second: 0 }, 0));
 
-    expect(findStops(track)).toEqual(repeat(7, false));
+    expect(stopsOf(track)).toEqual(repeat(7, false));
   });
 
   it("marks thirty seconds of drift within a four meter radius, as GPS noise does not cancel a stop", () => {
     const track = trackOf(walk(31, { meter: 0, second: 0 }, DRIFT_METER_PER_SECOND));
 
-    expect(findStops(track)).toEqual(repeat(31, true));
+    expect(stopsOf(track)).toEqual(repeat(31, true));
   });
 
   it("leaves thirty seconds of steady progress at four kilometers per hour unmarked", () => {
     const track = trackOf(walk(31, { meter: 0, second: 0 }, WALKING_METER_PER_SECOND));
 
-    expect(findStops(track)).toEqual(repeat(31, false));
+    expect(stopsOf(track)).toEqual(repeat(31, false));
   });
 
   it("marks only the stationary points of a ride that pauses thirty seconds mid-way", () => {
@@ -105,11 +117,7 @@ describe("a stop is at least ten seconds of immobility within a six meter radius
       ...walk(3, { meter: 40, second: 34 }, RIDING_METER_PER_SECOND),
     ]);
 
-    expect(findStops(track)).toEqual([
-      ...repeat(3, false),
-      ...repeat(31, true),
-      ...repeat(3, false),
-    ]);
+    expect(stopsOf(track)).toEqual([...repeat(3, false), ...repeat(31, true), ...repeat(3, false)]);
   });
 });
 
@@ -120,7 +128,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 5000, second: 600 },
     ]);
 
-    const breakdown = timeBreakdown(track, [false, false], 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
 
     expect(seconds(breakdown.gap)).toBe(600);
     expect(seconds(breakdown.moving)).toBe(0);
@@ -133,7 +141,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 0, second: 600 },
     ]);
 
-    const breakdown = timeBreakdown(track, [true, true], 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [true, true]), 0, 1);
 
     expect(seconds(breakdown.gap)).toBe(600);
     expect(seconds(breakdown.stopped)).toBe(0);
@@ -146,7 +154,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 65, second: 59 },
     ]);
 
-    const breakdown = timeBreakdown(track, [false, false], 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
 
     expect(seconds(breakdown.gap)).toBe(0);
     expect(seconds(breakdown.moving)).toBe(59);
@@ -158,7 +166,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 66, second: 60 },
     ]);
 
-    const breakdown = timeBreakdown(track, [false, false], 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
 
     expect(seconds(breakdown.gap)).toBe(0);
     expect(seconds(breakdown.moving)).toBe(60);
@@ -169,7 +177,7 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
   it("gives the whole duration to movement on a segment without stop or gap", () => {
     const track = trackOf(walk(11, { meter: 0, second: 0 }, WALKING_METER_PER_SECOND));
 
-    const breakdown = timeBreakdown(track, repeat(11, false), 0, 10);
+    const breakdown = timeBreakdown(analysed(track, repeat(11, false)), 0, 10);
 
     expect(seconds(breakdown.moving)).toBe(10);
     expect(seconds(breakdown.stopped)).toBe(0);
@@ -183,7 +191,7 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
       { meter: 0, second: 20 },
     ]);
 
-    const breakdown = timeBreakdown(track, repeat(3, true), 0, 2);
+    const breakdown = timeBreakdown(analysed(track, repeat(3, true)), 0, 2);
 
     expect(seconds(breakdown.stopped)).toBe(20);
     expect(seconds(breakdown.moving)).toBe(0);
@@ -197,7 +205,7 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
       { meter: 20, second: 30 },
     ]);
 
-    const breakdown = timeBreakdown(track, [false, true, true, false], 0, 3);
+    const breakdown = timeBreakdown(analysed(track, [false, true, true, false]), 0, 3);
 
     expect(seconds(breakdown.moving)).toBe(20);
     expect(seconds(breakdown.stopped)).toBe(10);
@@ -209,8 +217,9 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
         const fromIdx = Math.min(a % track.length, b % track.length);
         const toIdx = Math.max(a % track.length, b % track.length);
 
-        const breakdown = timeBreakdown(track, flags.slice(0, track.length), fromIdx, toIdx);
-        const elapsed = timeOf(track, toIdx).since(timeOf(track, fromIdx));
+        const analysedTrack = analysed(track, flags);
+        const breakdown = timeBreakdown(analysedTrack, fromIdx, toIdx);
+        const elapsed = timeOf(analysedTrack, toIdx).since(timeOf(analysedTrack, fromIdx));
 
         expect(
           seconds(breakdown.moving) + seconds(breakdown.stopped) + seconds(breakdown.gap),

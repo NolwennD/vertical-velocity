@@ -1,6 +1,10 @@
 import { DEFAULTS, type Thresholds } from "../constants";
-import type { Track } from "../gpx/parser";
+import { type AtLeastTwo, mapAtLeastTwo } from "../type";
 import { haversine } from "./geo";
+import type { SmoothedPoint, SmoothedTrack } from "./smooth";
+
+export type AnalysedPoint = SmoothedPoint & { stopped: boolean };
+export type AnalysedTrack = AtLeastTwo<AnalysedPoint>;
 
 export type TimeBreakdown = {
   moving: Temporal.Duration;
@@ -10,20 +14,20 @@ export type TimeBreakdown = {
 
 const ZERO = Temporal.Duration.from({ seconds: 0 });
 
-export function findStops(points: Track, t: Thresholds = DEFAULTS): readonly boolean[] {
-  const stopped: boolean[] = points.map(() => false);
+export function detectStops(track: SmoothedTrack, t: Thresholds = DEFAULTS): AnalysedTrack {
+  const stopped: boolean[] = track.map(() => false);
   let start = 0;
 
-  while (start < points.length) {
-    const anchor = points[start];
+  while (start < track.length) {
+    const anchor = track[start];
     if (anchor === undefined) {
       break;
     }
 
     let end = start;
     let last = anchor;
-    for (let next = start + 1; next < points.length; next += 1) {
-      const candidate = points[next];
+    for (let next = start + 1; next < track.length; next += 1) {
+      const candidate = track[next];
       if (candidate === undefined || haversine(anchor, candidate) >= t.stopRadiusM) {
         break;
       }
@@ -43,12 +47,11 @@ export function findStops(points: Track, t: Thresholds = DEFAULTS): readonly boo
     }
   }
 
-  return stopped;
+  return mapAtLeastTwo(track, (point, index) => ({ ...point, stopped: stopped[index] ?? false }));
 }
 
 export function timeBreakdown(
-  points: Track,
-  stopped: readonly boolean[],
+  track: AnalysedTrack,
   fromIdx: number,
   toIdx: number,
   t: Thresholds = DEFAULTS,
@@ -58,8 +61,8 @@ export function timeBreakdown(
   let gapTime = ZERO;
 
   for (let index = fromIdx; index < toIdx; index += 1) {
-    const from = points[index];
-    const to = points[index + 1];
+    const from = track[index];
+    const to = track[index + 1];
     if (from === undefined || to === undefined) {
       continue;
     }
@@ -68,7 +71,7 @@ export function timeBreakdown(
 
     if (elapsed.total("seconds") > t.recordingGapS) {
       gapTime = gapTime.add(elapsed);
-    } else if (stopped[index] && stopped[index + 1]) {
+    } else if (from.stopped && to.stopped) {
       stoppedTime = stoppedTime.add(elapsed);
     } else {
       movingTime = movingTime.add(elapsed);

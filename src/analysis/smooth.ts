@@ -1,45 +1,44 @@
 import { DEFAULTS, type Thresholds } from "../constants";
 import type { Track, TrackPoint } from "../gpx/parser";
-import type { AtLeastTwo } from "../type";
+import { type AtLeastTwo, mapAtLeastTwo } from "../type";
 import { cumulativeDistances } from "./geo";
 
 export type SmoothedPoint = TrackPoint & { smoothedEle: number; distanceM: number };
 export type SmoothedTrack = AtLeastTwo<SmoothedPoint>;
 
-type Sample = { distanceM: number; ele: number };
-
 const median = (values: readonly number[]): number | undefined =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-const medianFiltered = (samples: readonly Sample[], windowPoints: number): Sample[] => {
+const medianFiltered = (track: SmoothedTrack, windowPoints: number): SmoothedTrack => {
   const half = Math.floor(windowPoints / 2);
 
-  return samples.map((sample, index) => {
-    const radius = Math.min(half, index, samples.length - 1 - index);
-    const window = samples.slice(index - radius, index + radius + 1).map((other) => other.ele);
-    return { ...sample, ele: median(window) ?? sample.ele };
+  return mapAtLeastTwo(track, (point, index) => {
+    const radius = Math.min(half, index, track.length - 1 - index);
+    const window = track
+      .slice(index - radius, index + radius + 1)
+      .map((other) => other.smoothedEle);
+    return { ...point, smoothedEle: median(window) ?? point.smoothedEle };
   });
 };
 
-const movingAverage = (samples: readonly Sample[], windowMeter: number): Sample[] => {
+const movingAverage = (track: SmoothedTrack, windowMeter: number): SmoothedTrack => {
   const half = windowMeter / 2;
-  const start = samples.at(0)?.distanceM ?? 0;
-  const end = samples.at(-1)?.distanceM ?? 0;
-  const averaged: Sample[] = [];
+  const start = track[0].distanceM;
+  const end = track.at(-1)?.distanceM ?? start;
 
-  for (const [index, sample] of samples.entries()) {
-    const centre = sample.distanceM;
+  return mapAtLeastTwo(track, (point, index) => {
+    const centre = point.distanceM;
     const radius = Math.min(half, centre - start, end - centre);
-    let sum = sample.ele;
+    let sum = point.smoothedEle;
     let count = 1;
 
     const walk = (step: number): void => {
-      for (let other = index + step; other >= 0 && other < samples.length; other += step) {
-        const neighbour = samples[other];
+      for (let other = index + step; other >= 0 && other < track.length; other += step) {
+        const neighbour = track[other];
         if (neighbour === undefined || Math.abs(neighbour.distanceM - centre) > radius) {
           break;
         }
-        sum += neighbour.ele;
+        sum += neighbour.smoothedEle;
         count += 1;
       }
     };
@@ -47,30 +46,17 @@ const movingAverage = (samples: readonly Sample[], windowMeter: number): Sample[
     walk(-1);
     walk(1);
 
-    averaged.push({ ...sample, ele: sum / count });
-  }
-
-  return averaged;
+    return { ...point, smoothedEle: sum / count };
+  });
 };
 
 export function smoothTrack(points: Track, t: Thresholds = DEFAULTS): SmoothedTrack {
   const cumulative = cumulativeDistances(points);
-  const samples = points.map((point, index) => ({
+  const enriched = mapAtLeastTwo(points, (point, index) => ({
+    ...point,
     distanceM: cumulative[index] ?? 0,
-    ele: point.ele,
+    smoothedEle: point.ele,
   }));
-  const smoothed = movingAverage(medianFiltered(samples, t.medianWindowPoints), t.smoothingWindowM);
 
-  const merge = (point: TrackPoint, index: number): SmoothedPoint => {
-    const sample = smoothed[index];
-    return { ...point, smoothedEle: sample?.ele ?? point.ele, distanceM: sample?.distanceM ?? 0 };
-  };
-
-  const [first, second, ...rest] = points;
-
-  return [
-    merge(first, 0),
-    merge(second, 1),
-    ...rest.map((point, index) => merge(point, index + 2)),
-  ];
+  return movingAverage(medianFiltered(enriched, t.medianWindowPoints), t.smoothingWindowM);
 }
