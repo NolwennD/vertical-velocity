@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectClimbs } from "../src/analysis/climbs";
-import { type SmoothedTrack, smoothTrack } from "../src/analysis/smooth";
+import { smoothTrack } from "../src/analysis/smooth";
+import { type AnalysedTrack, detectStops } from "../src/analysis/stops";
 import { DEFAULTS } from "../src/constants";
 import type { Track } from "../src/gpx/parser";
 import { atLeastTwo, pointAt } from "./helpers/track";
@@ -12,8 +13,8 @@ const trackOf = (elevations: readonly number[], spacingMeter: number): Track =>
     elevations.map((ele, index) => pointAt({ meter: index * spacingMeter, ele, second: index })),
   );
 
-const profileOf = (elevations: readonly number[], spacingMeter: number): SmoothedTrack =>
-  smoothTrack(trackOf(elevations, spacingMeter), UNSMOOTHED);
+const profileOf = (elevations: readonly number[], spacingMeter: number): AnalysedTrack =>
+  detectStops(smoothTrack(trackOf(elevations, spacingMeter), UNSMOOTHED));
 
 const leg = (from: number, count: number, deltaPerPoint: number): number[] =>
   Array.from({ length: count }, (_, index) => from + (index + 1) * deltaPerPoint);
@@ -101,24 +102,22 @@ describe("a segment is kept only if it exceeds the minimum gain and grade", () =
   });
 });
 
-describe("a segment spans a range of the track that can be read back", () => {
-  it("reports indices inside the track, with the start before the end", () => {
-    const track = profileOf([1000, ...leg(1000, 40, 0.5)], 10);
+describe("a climb is the stretch of track it covers", () => {
+  it("carries the points from the foot of the climb to its summit", () => {
+    const climbs = detectClimbs(profileOf([1000, ...leg(1000, 40, 0.5)], 10));
+    const [climb] = climbs;
 
-    for (const { startIdx, endIdx } of detectClimbs(track)) {
-      expect(startIdx).toBeGreaterThanOrEqual(0);
-      expect(startIdx).toBeLessThan(endIdx);
-      expect(endIdx).toBeLessThan(track.length);
-    }
+    expect(climb?.[0]?.smoothedEle).toBe(1000);
+    expect(climb?.at(-1)?.smoothedEle).toBe(1020);
   });
 
-  it("reports segments in order, without overlap", () => {
-    const segments = detectClimbs(profileOf(SAWTOOTH, 10));
+  it("reports climbs in order, without overlap", () => {
+    const climbs = detectClimbs(profileOf(SAWTOOTH, 10));
 
-    for (const [index, segment] of segments.entries()) {
-      const previous = segments[index - 1];
+    for (const [index, climb] of climbs.entries()) {
+      const previous = climbs[index - 1];
       if (previous !== undefined) {
-        expect(segment.startIdx).toBeGreaterThanOrEqual(previous.endIdx);
+        expect(climb[0].distanceM).toBeGreaterThanOrEqual(previous.at(-1)?.distanceM ?? 0);
       }
     }
   });

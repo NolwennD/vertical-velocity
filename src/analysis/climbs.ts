@@ -1,52 +1,59 @@
 import { DEFAULTS, type Thresholds } from "../constants";
-import type { SmoothedTrack } from "./smooth";
+import { type AtLeastTwo, isAtLeastTwo } from "../type";
+import type { AnalysedPoint, AnalysedTrack } from "./stops";
 
-export type Segment = { startIdx: number; endIdx: number };
+export type Climb = AtLeastTwo<AnalysedPoint>;
 
-const rising = (track: SmoothedTrack): Segment[] => {
+type Segment = {
+  startIdx: number;
+  endIdx: number;
+  start: AnalysedPoint;
+  end: AnalysedPoint;
+};
+
+const rising = (track: AnalysedTrack): Segment[] => {
+  const [first, ...rest] = track;
   const segments: Segment[] = [];
-  let startIdx: number | undefined;
+  let open: { startIdx: number; start: AnalysedPoint } | undefined;
+  let previous = first;
 
-  for (let index = 1; index < track.length; index += 1) {
-    const previous = track[index - 1];
-    const current = track[index];
-    if (previous === undefined || current === undefined) {
-      continue;
-    }
-
+  for (const [offset, current] of rest.entries()) {
     if (current.smoothedEle > previous.smoothedEle) {
-      startIdx ??= index - 1;
-    } else if (startIdx !== undefined) {
-      segments.push({ startIdx, endIdx: index - 1 });
-      startIdx = undefined;
+      open ??= { startIdx: offset, start: previous };
+    } else if (open !== undefined) {
+      segments.push({ ...open, endIdx: offset, end: previous });
+      open = undefined;
     }
+    previous = current;
   }
 
-  if (startIdx !== undefined) {
-    segments.push({ startIdx, endIdx: track.length - 1 });
+  if (open !== undefined) {
+    segments.push({ ...open, endIdx: track.length - 1, end: previous });
   }
 
   return segments;
 };
 
-const merged = (segments: readonly Segment[], track: SmoothedTrack, t: Thresholds): Segment[] => {
+const merged = (segments: readonly Segment[], t: Thresholds): Segment[] => {
   const kept: Segment[] = [];
 
   for (const segment of segments) {
     const previous = kept.at(-1);
-    const top = previous === undefined ? undefined : track[previous.endIdx];
-    const bottom = track[segment.startIdx];
-
-    if (previous === undefined || top === undefined || bottom === undefined) {
+    if (previous === undefined) {
       kept.push(segment);
       continue;
     }
 
-    const drop = top.smoothedEle - bottom.smoothedEle;
-    const distance = bottom.distanceM - top.distanceM;
+    const drop = previous.end.smoothedEle - segment.start.smoothedEle;
+    const distance = segment.start.distanceM - previous.end.distanceM;
 
     if (drop <= t.mergeMaxDropM && distance <= t.mergeMaxDistanceM) {
-      kept[kept.length - 1] = { startIdx: previous.startIdx, endIdx: segment.endIdx };
+      kept[kept.length - 1] = {
+        startIdx: previous.startIdx,
+        endIdx: segment.endIdx,
+        start: previous.start,
+        end: segment.end,
+      };
     } else {
       kept.push(segment);
     }
@@ -55,24 +62,16 @@ const merged = (segments: readonly Segment[], track: SmoothedTrack, t: Threshold
   return kept;
 };
 
-const significant = (
-  segments: readonly Segment[],
-  track: SmoothedTrack,
-  t: Thresholds,
-): Segment[] =>
-  segments.filter((segment) => {
-    const start = track[segment.startIdx];
-    const end = track[segment.endIdx];
-    if (start === undefined || end === undefined) {
-      return false;
-    }
+const significant = ({ start, end }: Segment, t: Thresholds): boolean => {
+  const gain = end.smoothedEle - start.smoothedEle;
+  const distance = end.distanceM - start.distanceM;
 
-    const gain = end.smoothedEle - start.smoothedEle;
-    const distance = end.distanceM - start.distanceM;
+  return gain >= t.minClimbGainM && distance > 0 && gain / distance >= t.minClimbGrade;
+};
 
-    return gain >= t.minClimbGainM && distance > 0 && gain / distance >= t.minClimbGrade;
-  });
-
-export function detectClimbs(track: SmoothedTrack, t: Thresholds = DEFAULTS): Segment[] {
-  return significant(merged(rising(track), track, t), track, t);
+export function detectClimbs(track: AnalysedTrack, t: Thresholds = DEFAULTS): Climb[] {
+  return merged(rising(track), t)
+    .filter((segment) => significant(segment, t))
+    .map(({ startIdx, endIdx }): readonly AnalysedPoint[] => track.slice(startIdx, endIdx + 1))
+    .filter(isAtLeastTwo);
 }

@@ -1,6 +1,8 @@
 export type NonEmptyArray<T> = readonly [T, ...T[]];
 export type AtLeastTwo<T> = readonly [T, T, ...T[]];
 
+export const isAtLeastTwo = <T>(items: readonly T[]): items is AtLeastTwo<T> => items.length >= 2;
+
 export const mapAtLeastTwo = <T, U>(
   items: AtLeastTwo<T>,
   transform: (item: T, index: number) => U,

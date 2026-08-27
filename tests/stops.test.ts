@@ -114,7 +114,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 5000, second: 600 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]));
 
     expect(seconds(breakdown.gap)).toBe(600);
     expect(seconds(breakdown.moving)).toBe(0);
@@ -127,7 +127,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 0, second: 600 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, [true, true]), 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [true, true]));
 
     expect(seconds(breakdown.gap)).toBe(600);
     expect(seconds(breakdown.stopped)).toBe(0);
@@ -140,7 +140,7 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 65, second: 59 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]));
 
     expect(seconds(breakdown.gap)).toBe(0);
     expect(seconds(breakdown.moving)).toBe(59);
@@ -152,18 +152,18 @@ describe("an interval longer than sixty seconds is a recording gap, neither move
       { meter: 66, second: 60 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, [false, false]), 0, 1);
+    const breakdown = timeBreakdown(analysed(track, [false, false]));
 
     expect(seconds(breakdown.gap)).toBe(0);
     expect(seconds(breakdown.moving)).toBe(60);
   });
 });
 
-describe("timeBreakdown allocates the whole duration of a segment without losing any of it", () => {
+describe("timeBreakdown allocates the whole duration of a track without losing any of it", () => {
   it("gives the whole duration to movement on a segment without stop or gap", () => {
     const track = trackOf(walk(11, { meter: 0, second: 0 }, WALKING_METER_PER_SECOND));
 
-    const breakdown = timeBreakdown(analysed(track, repeat(11, false)), 0, 10);
+    const breakdown = timeBreakdown(analysed(track, repeat(11, false)));
 
     expect(seconds(breakdown.moving)).toBe(10);
     expect(seconds(breakdown.stopped)).toBe(0);
@@ -177,7 +177,7 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
       { meter: 0, second: 20 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, repeat(3, true)), 0, 2);
+    const breakdown = timeBreakdown(analysed(track, repeat(3, true)));
 
     expect(seconds(breakdown.stopped)).toBe(20);
     expect(seconds(breakdown.moving)).toBe(0);
@@ -191,21 +191,20 @@ describe("timeBreakdown allocates the whole duration of a segment without losing
       { meter: 20, second: 30 },
     ]);
 
-    const breakdown = timeBreakdown(analysed(track, [false, true, true, false]), 0, 3);
+    const breakdown = timeBreakdown(analysed(track, [false, true, true, false]));
 
     expect(seconds(breakdown.moving)).toBe(20);
     expect(seconds(breakdown.stopped)).toBe(10);
   });
 
-  it("splits any segment into movement, stops and gaps that add up to its elapsed time", () => {
+  it("splits any track into movement, stops and gaps that add up to its elapsed time", () => {
     fc.assert(
-      fc.property(arbitraryTrack, arbitraryFlags, fc.nat(), fc.nat(), (track, flags, a, b) => {
-        const fromIdx = Math.min(a % track.length, b % track.length);
-        const toIdx = Math.max(a % track.length, b % track.length);
-
+      fc.property(arbitraryTrack, arbitraryFlags, (track, flags) => {
         const analysedTrack = analysed(track, flags);
-        const breakdown = timeBreakdown(analysedTrack, fromIdx, toIdx);
-        const elapsed = timeOf(analysedTrack, toIdx).since(timeOf(analysedTrack, fromIdx));
+        const breakdown = timeBreakdown(analysedTrack);
+        const elapsed = timeOf(analysedTrack, analysedTrack.length - 1).since(
+          timeOf(analysedTrack, 0),
+        );
 
         expect(
           seconds(breakdown.moving) + seconds(breakdown.stopped) + seconds(breakdown.gap),

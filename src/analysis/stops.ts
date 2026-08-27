@@ -50,17 +50,12 @@ export function detectStops(track: SmoothedTrack, t: Thresholds = DEFAULTS): Ana
   return mapAtLeastTwo(track, (point, index) => ({ ...point, stopped: stopped[index] ?? false }));
 }
 
-export function timeBreakdown(
-  track: AnalysedTrack,
-  fromIdx: number,
-  toIdx: number,
-  t: Thresholds = DEFAULTS,
-): TimeBreakdown {
+export function timeBreakdown(track: AnalysedTrack, t: Thresholds = DEFAULTS): TimeBreakdown {
   let movingTime = ZERO;
   let stoppedTime = ZERO;
   let gapTime = ZERO;
 
-  for (let index = fromIdx; index < toIdx; index += 1) {
+  for (let index = 0; index < track.length - 1; index += 1) {
     const from = track[index];
     const to = track[index + 1];
     if (from === undefined || to === undefined) {
