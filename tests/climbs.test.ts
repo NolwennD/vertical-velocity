@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectClimbs } from "../src/analysis/climbs";
+import { type AnalysedTrack, detectImmobility } from "../src/analysis/immobility";
 import { smoothTrack } from "../src/analysis/smooth";
-import { type AnalysedTrack, detectStops } from "../src/analysis/stops";
 import { DEFAULTS } from "../src/constants";
 import type { Track } from "../src/gpx/parser";
 import { atLeastTwo, pointAt } from "./helpers/track";
@@ -14,7 +14,7 @@ const trackOf = (elevations: readonly number[], spacingMeter: number): Track =>
   );
 
 const profileOf = (elevations: readonly number[], spacingMeter: number): AnalysedTrack =>
-  detectStops(smoothTrack(trackOf(elevations, spacingMeter), UNSMOOTHED));
+  detectImmobility(smoothTrack(trackOf(elevations, spacingMeter), UNSMOOTHED));
 
 const leg = (from: number, count: number, deltaPerPoint: number): number[] =>
   Array.from({ length: count }, (_, index) => from + (index + 1) * deltaPerPoint);

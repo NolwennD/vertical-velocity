@@ -1,6 +1,6 @@
 import { DEFAULTS, type Thresholds } from "../constants";
 import { type AtLeastTwo, isAtLeastTwo } from "../type";
-import type { AnalysedPoint, AnalysedTrack } from "./stops";
+import type { AnalysedPoint, AnalysedTrack } from "./immobility";
 
 export type Climb = AtLeastTwo<AnalysedPoint>;
 
